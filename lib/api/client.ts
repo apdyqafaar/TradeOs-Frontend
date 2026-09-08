@@ -24,7 +24,16 @@ import { getQueryClient } from "@/lib/query/client";
 export const api: AxiosInstance = axios.create({
   baseURL: env.apiBaseUrl,
   withCredentials: true,
-  headers: { "Content-Type": "application/json" },
+  // No `Content-Type` default, deliberately. Axios already sets
+  // `application/json` for any plain-object body, so JSON requests are
+  // byte-identical without it — but an instance-level default is applied to
+  // EVERY body, including a `FormData` one, and axios's `transformRequest`
+  // then honours it by running the FormData through `JSON.stringify`. The
+  // upload silently posts `{"file":{},"purpose":"product"}` as JSON: no
+  // error, no file, and nothing in the types to suggest it. Verified against
+  // axios 1.20 with a stub adapter. Leaving the default off means a
+  // `FormData` body keeps its type and the browser writes the multipart
+  // boundary itself, which is the only way that boundary can be correct.
   // Long enough for a product import commit (one transaction over up to 2,000
   // rows), short enough that a dead connection surfaces as an error the user
   // can act on rather than a spinner that never resolves.

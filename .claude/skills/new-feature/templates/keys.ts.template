@@ -39,7 +39,7 @@ export const __resource__Keys = {
    * delete invalidates: both change which rows land on which page and both
    * change `meta.total`, so no single cached page can be patched to match.
    */
-  lists: () => keys.lists(),
+  lists: () => keys.lists,
 
   /**
    * One list. `params` is part of the key, which is exactly why
@@ -47,11 +47,26 @@ export const __resource__Keys = {
    * key, and an unstable object would make two identical filter sets look like
    * two different queries.
    */
-  list: (params: __Resource__ListParams) => keys.list(params),
+  list: (params: __Resource__ListParams) => keys.list({ ...params }),
 
   /** Every detail entry — the target when a bulk action touched many rows. */
-  details: () => keys.details(),
+  details: () => keys.details,
 
   /** One row. Seeded from a mutation response and read by the detail page. */
   detail: (id: ObjectId) => keys.detail(id),
 } as const;
+
+/*
+ * NOTE on the two `() =>` wrappers above.
+ *
+ * `createQueryKeys` exposes `all`, `lists` and `details` as readonly ARRAYS and
+ * `list()` / `detail()` as functions — read `lib/query/keys.ts`. So the bodies
+ * here are `keys.lists`, not `keys.lists()`. Calling them is a type error
+ * ("has no call signatures"), and this template shipped that mistake once,
+ * which two feature slices then copied.
+ *
+ * The wrapper still presents `lists()` and `details()` as functions so every
+ * key in a slice is invoked the same way at the call site. `list()` spreads
+ * its params because `QueryKeyParams` is an index-signature type and a plain
+ * `interface` does not satisfy one without the spread.
+ */

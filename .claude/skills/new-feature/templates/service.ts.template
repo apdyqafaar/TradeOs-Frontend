@@ -39,9 +39,19 @@ import type { __Resource__, __Resource__ListParams } from "../types";
  */
 const BASE = "/__resources-kebab__";
 
-/** `GET /__resources-kebab__` — always paginated, so always `apiGetList`. */
+/**
+ * `GET /__resources-kebab__` — always paginated, so always `apiGetList`.
+ *
+ * Note `{ params }`, not `params`. `apiGetList(url, config)` takes an axios
+ * REQUEST CONFIG as its second argument, so passing the params object bare
+ * makes axios read `page`, `limit` and the rest as config keys it does not
+ * recognise, and it sends NO query string at all — every filter silently
+ * dropped, every list unfiltered. TypeScript cannot catch it: `params` is a
+ * variable rather than an object literal, so excess-property checking never
+ * runs. This template shipped that mistake once.
+ */
 export const list = (params: __Resource__ListParams): Promise<Paginated<__Resource__>> =>
-  apiGetList<__Resource__>(BASE, params);
+  apiGetList<__Resource__>(BASE, { params });
 
 /**
  * `GET /__resources-kebab__/:id`
