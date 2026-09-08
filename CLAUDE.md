@@ -7,19 +7,24 @@ Guidance for Claude Code working in the TradeOs frontend. The design specificati
 `../Backend/docs/BACKEND-GUIDE.md`. When this file and the brief disagree, the brief wins for
 *what* to build and this file wins for *how*.
 
-## Where things stand (2026-09-07)
+## Where things stand (2026-09-08)
 
-The **foundation is complete**; no product feature is built yet. What exists: the app shell
-(sidebar, topbar, breadcrumbs, theme), the API client and error model, the query layer, the auth
-session/permission hooks, the UI store, formatters, the shared `DataTable`/`EmptyState`, and a
-feature scaffolder skill. `app/(app)/overview` and `app/(auth)/login` are placeholders that exist
-to prove the wiring — replace them, do not extend them.
+**Slice 1 is complete: auth, the shell, and the Overview.** Every screen a person needs to get into
+the product exists — register, verify email, sign in, two-factor, forgot/reset password, accept an
+invitation, create a business, and a working Overview inside the canvas-exact shell. Routes are
+guarded by permission, and a signed-in user with no business is sent to onboarding.
 
-Verified at the time of writing: `bunx tsc --noEmit` clean, `bunx biome check` clean,
-`bunx vitest run` 72 passing across 6 files, `bun run build` succeeds, and `proxy.ts` redirects
-correctly in a live dev server.
+**Not built:** everything in the design canvas's artboards `2a`–`2m` — the counter, products,
+customers, debts, reports, members, roles, settings, account, projects, announcements, Help Center.
+That is Slice 2 onward, in the order the brief's §10 lists.
 
-Build features in the order the brief's §10 lists them.
+Verified 2026-09-08: `bun run check` clean (117 tests / 22 files, tsc, biome), `bun run build`
+succeeds across 13 routes, `/login` compared against artboard `1f` in a real browser in both themes,
+and a live round trip through the Next rewrite to Express — register → verify → create business →
+`GET /dashboard` — confirming the wire shapes in `features/dashboard/types.ts`.
+
+**Never driven in a real authenticated browser session.** The Overview has not been *seen* with real
+data. See `docs/FINDINGS.md` §5.
 
 ## Runtime & commands
 
@@ -33,7 +38,7 @@ Bun, not Node — use `bun`, never `npm`.
 - Lint + format: `bun run lint` (check) · `bun run lint:fix` (write)
 - **Everything at once: `bun run check`** — typecheck, lint, test. Run it before saying you are done.
 
-The API must be running separately (`cd ../Backend && bun run dev`, port 8000). Without it the shell
+The API must be running separately (`cd ../Backend && bun run dev`). It listens on the port in `Backend/.env` — currently **8001** — and `API_ORIGIN` in `.env.local` must match it. Without it the shell
 renders but every query fails; that is the expected offline state, not a bug.
 
 ## Architecture
@@ -171,3 +176,18 @@ Vitest + happy-dom + Testing Library. Config is `vitest.config.mts` (**`.mts` de
   most paths in `config/routes.ts` have no page yet. Turn it on once the route tree is complete.
 - **A dead network is not retried** (`ApiError` uses status 0, which the retry policy treats as
   final). If the mobile-heavy market makes offline blips common, exempt status 0 — it is one line.
+
+## Findings
+
+`docs/FINDINGS.md` holds what was learned building this that the code cannot tell you — open
+decisions for the owner, bugs that shipped green once, and gotchas with real cost. Read §1 and §2
+before starting a slice. Per-task detail is in `docs/findings/`.
+
+Two entries there change how you work and are worth repeating here:
+
+- **The client permission layers are UX, not security.** `proxy.ts` checks only that a cookie
+  exists, `RouteGuard` and `PermissionGate` hide what the caller cannot use, and **the API is the
+  only thing enforcing anything.** Never treat the first two as a boundary.
+- **Money direction.** `exchangeRate` is units of *main* per one unit of *exchange*, so converting
+  to the main currency **multiplies**. The inverse reads more naturally out loud, which is exactly
+  how it shipped backwards once.

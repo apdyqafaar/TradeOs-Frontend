@@ -1,0 +1,175 @@
+# Findings and alerts
+
+Things discovered while building the frontend that you should know about, but that are **not** part
+of any task's requirements. The per-task record is in `docs/findings/`; this file keeps the ones
+that outlive their task — risks, decisions that need you, and gotchas that will bite the next
+person. Newest first within each section. Every entry says what was actually verified.
+
+---
+
+## 1. Needs a decision from you
+
+### Accepting a second invitation silently rewrites an existing account
+**Status: open, nobody has ruled. Verified in backend source.** When an invited person *already has
+a TradeOs account*, `POST /auth/accept-invite` applies the name and password they type on the invite
+form to that existing account and revokes every one of their other sessions
+(`Backend/src/services/auth.service.ts:374-397`, `:442`). So "Your name" renames an account they
+already have, and "Password" is a password reset they did not ask for.
+
+The frontend cannot warn them: the endpoint is public and exposes nothing about the token before
+submission, so the page has no way to tell a new invitee from a returning one. Options are to
+ignore name/password for an existing user, to prompt them to sign in instead of filling the form, or
+to accept it. This is a backend product call.
+
+### Day one is a long column of empty panels
+**Status: open.** Artboard `1e` draws only "First steps" and "Nothing to chart yet" for a
+brand-new business, and says nothing about the rest. But a new owner still receives `debts`,
+`stock`, `staff`, `projects`, `announcements` and `team` from `GET /dashboard` — all empty — so the
+page renders First steps followed by six calm empty panels. Suppressing them until the business has
+data is one condition in `features/dashboard/components/overview.tsx`; leaving them is also
+defensible (it shows what the product will do). Nobody has ruled.
+
+### Registering, then refreshing, loses the "check your email" panel
+**Status: open, degrades rather than breaks.** `/register` is in `proxy.ts`'s `GUEST_ONLY_PATHS`
+and registration *sets a session cookie*, so a refresh on the check-your-email panel bounces the
+user to `/overview`, then `RouteGuard` sends them to `/onboarding` — which does tell them to verify.
+The specific "we sent a link to <address>" message is what is lost. Fixing it properly means
+deciding where that message lives: a dedicated route, or onboarding's own notice.
+
+### Contrast: decided, recorded here so it is not reopened
+**Status: ruled by the owner on 2026-09-07 — design fidelity wins.** The active nav pill
+(#D97757 on #F6E7DF, 2.6:1) and the primary button (3.0:1) are below WCAG AA for small text. They
+match the design canvas exactly, which is what was asked for. `app/globals.test.ts` locks both
+values with a comment naming the decision. Do not "fix" them without asking.
+
+---
+
+## 2. Bugs found and fixed — each one shipped green
+
+### `formatExchange` converted money in the wrong direction
+**Fixed.** It divided by the exchange rate where the backend multiplies. `exchangeRate` is *units of
+MAIN per one unit of EXCHANGE* (`Backend/src/lib/money.ts:25-28`, `toMain = amount * rate`), so for
+a Kenyan shop taking dollars — main KES, exchange USD, rate 130 — a USD 100 tender is **KES 13,000**
+to the API and would have printed **KES 0.77** on the receipt.
+
+The existing test locked the wrong answer, so the suite was green. The root cause was in the design
+brief, which stated the pair backwards ("USD main, KES exchange at 130"); that has been corrected in
+four places. **The direction is easy to invert because the way people say it out loud is the inverse
+of the stored config.**
+
+### The two-factor challenge token was dropped, and nothing failed
+**Fixed.** `POST /auth/login` sets no cookie on the 2FA branch — `challengeToken` exists only in the
+response body. The login form branched on `twoFactorRequired` and navigated to `/login/2fa` without
+storing it, so the next screen had nothing to send and **a 2FA account could never finish signing
+in**. No test, no typecheck, no lint and no console error caught it; every check was green and the
+feature was simply impossible to use.
+
+The token now parks in `sessionStorage` (`features/auth/hooks/use-two-factor-challenge.ts`),
+deliberately not a `?challenge=` query param, which would put a value one six-digit guess from a
+session into browser history, the `Referer` of every subresource, and any proxy log. The regression
+guard in `login-form.test.tsx` was break-tested — removed the fix, watched it go red, restored it.
+
+### Dark `--border-strong` equalled `--border`
+**Fixed.** Every "strong" hairline was identical to a plain one, so the breadcrumb chevron was
+effectively invisible in dark mode. The canvas draws `#565349` (artboard `1d`), a full step lighter
+than the border it outranks.
+
+### `API_ORIGIN` pointed at the wrong port
+**Fixed.** `.env.local` said `8000`; the backend's `.env` runs it on **8001**. Every proxied request
+would have failed. Confirmed fixed by a live round trip: `POST /api/v1/auth/register` through the
+Next rewrite returns 201 with `Set-Cookie: tradeos_session=…; HttpOnly; SameSite=Lax`, first-party
+on `localhost:3000`, which is the whole reason for the rewrite.
+
+### Five plan/brief claims that were wrong about the API
+All verified against backend source and then against a live server:
+
+- **`sales.trend7`, not `sales.trend`.** Before the type existed this read as a silent `undefined` —
+  a chart rendering nothing, with no error.
+- **`debts` also returns `dueWithin7Days: { count, amount }`.**
+- **`me.role` is `{ id, name }`**, an object, not a string.
+- **`organization` also returns `timezone`, and `currency` is `{ main, exchange, rate } | null`** —
+  not a currency code.
+- **`stock.lowStock[].threshold` is `number | null`.**
+- **There is no `DUPLICATE_EMAIL` code.** A taken address is `409 CONFLICT`.
+- **The inviting business's name is not available before accepting.** The brief promised
+  `Join {Business name}`; no public endpoint exposes it, and adding one would make a public route an
+  oracle confirming a guessed token is live.
+
+---
+
+## 3. Security and risk
+
+### `RouteGuard` is preset-shaped, not catalog-shaped
+`/overview`, `/announcements`, `/help` and `/account` are ungated because all three preset roles
+hold the permissions behind them. **Roles are editable**, so a hand-built custom role without
+`announcements:view` would see the nav item, pass the guard, and meet a 403 inside the panel.
+`RouteGuard` removes the common dead end, not every one — pages still owe brief §8.4 their own
+inline 403 handling. Gating `/overview` is also self-defeating: the ForbiddenScreen's way out points
+there.
+
+### The client permission layers are UX, not security
+Three layers, and only one of them enforces anything:
+
+| Layer | What it does |
+|---|---|
+| `proxy.ts` | Cookie present? Bounce to `/login` if not. Optimistic, never fetches. |
+| `RouteGuard` + `PermissionGate` | Hides what the caller cannot use, shows a calm refusal on a direct URL. |
+| **The API** | The only thing actually enforcing. 403, re-checked on every request. |
+
+Do not let a future change treat the first two as the boundary.
+
+### Next 16 Proxy now defaults to the Node runtime
+Previously Edge. Proxy code can now reach for `fs`/`crypto` and compile, so the "never fetch, never
+do slow work in the proxy" rule is easier to break by accident than when the runtime refused. The
+matcher syntax is unchanged from Middleware; the rename is file and function name only.
+
+### `proxy.ts` is a deny-list, and five paths must never be added to `GUEST_ONLY_PATHS`
+There is no public-paths allow-list, and adding one would be behaviour-identical dead code that
+*reads* like a gate. `/verify-email`, `/forgot-password`, `/reset-password`, `/accept-invite` and
+`/onboarding` already fall through in both states. Two have signed-in callers **by design**: a
+returning invitee is signed in when they click an invitation link
+(`Backend/src/services/auth.service.ts:338-397`), and a signed-in user may follow a verification
+link. Making either guest-only breaks a supported flow.
+
+---
+
+## 4. Operational gotchas
+
+- **Next 16 allows exactly one dev server per project directory, whatever the port.** A second
+  `next dev` in this repo fails outright with a `taskkill` suggestion. This blocks parallel agents
+  from each running one.
+- **`POST /auth/resend-verification` requires a session**, and the verification link is routinely
+  opened on a *different device* from the one that registered. An expired-link page must branch on
+  whether a session exists; offering a Resend button that 401s is the trap.
+- **Resending a verification email invalidates the link already in the inbox** — the backend clears
+  prior verifications before minting a new token, so the older email starts reading as expired.
+- **The real resend limit is 5 per hour**, not the 60-second UI cooldown, which is only a
+  double-click guard and does not survive a remount.
+- **Every invite failure is one `400 BAD_REQUEST`** — unknown, expired, already-accepted, mismatched
+  — deliberately, so the endpoint cannot be probed. A banned invitee is 403 and an existing-email
+  invitee is 409.
+- **`rounded-lg` is 10px in this repo** (`--radius: 0.625rem`), so the canvas's 8px rows need
+  `rounded-md`.
+- **Biome's `useSemanticElements` rejects `role="status"` and `role="group"`** — use `<output>` and
+  `<fieldset>` with an `sr-only` `<legend>`.
+- **`searchParams` is a Promise in Next 16.** Awaiting it in a Server Component avoids the
+  `<Suspense>` boundary `useSearchParams` would otherwise require.
+- **`**/verify-email**` inside a JSDoc block silently ends the comment.**
+
+---
+
+## 5. Deferred and worth doing
+
+- **`useOrganization()` costs a request the dashboard has already answered.** `GET /dashboard`
+  returns `organization.timezone` and `organization.currency`, so the Overview fetches the currency
+  config a second time. Reading it from the dashboard payload on that page would remove a request.
+- **No end-to-end browser test exists.** Everything is verified by unit test, typecheck, source
+  reading, and a live API round trip via `curl`. Nothing has driven a real authenticated browser
+  session — the Overview has never been *seen* with real data. Playwright would close this and is
+  the obvious next investment.
+- **A 429 shows twice** — the axios interceptor toasts centrally and the auth forms also banner it.
+  One cross-form cleanup.
+- **The `⌘K` search trigger is rendered and wired to nothing.**
+- **Passkey login renders disabled.** The backend supports it; the WebAuthn ceremony is unbuilt.
+- **`SheetOverlay` hardcodes `bg-black/10`** where the canvas wants ~45%; it is inside vendored
+  `components/ui/sheet.tsx`.
