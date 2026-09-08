@@ -67,10 +67,18 @@ export function formatExchange(
   const tendered = formatMoney(amount, currency);
   if (!Number.isFinite(rate) || rate <= 0) return { tendered, converted: null };
 
-  // The rate is "how many exchange units to one main unit" (USD main, KES
-  // exchange at 130), so the tendered amount divides by it.
+  // The rate is units of MAIN per one unit of EXCHANGE, so the tendered
+  // amount MULTIPLIES by it. This mirrors the backend exactly — see
+  // `toMain` in ../Backend/src/lib/money.ts, which is what actually prices
+  // the sale; a frontend that divides here shows the customer one number
+  // and charges them another.
+  //
+  // The direction is easy to get backwards because the obvious phrasing
+  // ("1 USD = 130 KES") is the inverse of the stored config. A Kenyan shop
+  // keeps its books in KES and takes dollars at the counter, so it is
+  // main: KES, exchange: USD, rate: 130 — one USD is worth 130 KES.
   return {
     tendered,
-    converted: `≈ ${formatMoney(amount / rate, mainCurrency)} @ ${RATE.format(rate)}`,
+    converted: `≈ ${formatMoney(amount * rate, mainCurrency)} @ ${RATE.format(rate)}`,
   };
 }

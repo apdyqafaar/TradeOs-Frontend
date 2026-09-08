@@ -4,26 +4,30 @@ import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { ROUTES } from "@/config/routes";
 
 /**
- * The claude.ai-like auth frame (section 3.3): one centred column on the cream
- * ground, wordmark top-left, no split-screen illustration and no marketing
- * copy. Pages supply only what goes inside the 400px column.
+ * The auth frame from artboard `1f` (`docs/design/TradeOs-UI.dc.html:2661`):
+ * one centred column on the cream ground, wordmark pinned top-left and the
+ * theme toggle top-right. No split-screen illustration, no marketing copy —
+ * pages supply only what goes inside the 400px column.
  */
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between px-6 py-5">
-        <Link
-          href={ROUTES.login}
-          className="rounded-sm font-medium text-sm tracking-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          TradeOs
-        </Link>
-        <ThemeToggle />
-      </header>
+    <div className="relative flex flex-1 flex-col items-center justify-center bg-background px-6 py-24">
+      <Link
+        href={ROUTES.login}
+        className="absolute top-[22px] left-[26px] rounded-sm font-semibold text-[15px] tracking-[-0.01em] outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        TradeOs
+      </Link>
 
-      <main className="flex flex-1 items-center justify-center px-6 pb-24">
-        <div className="w-full max-w-[400px]">{children}</div>
-      </main>
+      {/* The canvas draws a 32px bordered square here, but `ThemeToggle` is a
+          shared component owned by the shell and takes no `className`. Styling
+          it through the wrapper keeps the one toggle everywhere instead of
+          forking a second one for this frame. */}
+      <div className="absolute top-5 right-6 *:size-8 *:rounded-[9px] *:border *:border-border *:bg-card">
+        <ThemeToggle />
+      </div>
+
+      <main className="flex w-full justify-center">{children}</main>
     </div>
   );
 }

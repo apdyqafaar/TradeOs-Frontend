@@ -156,3 +156,45 @@ export const NAV_GROUPS: NavGroup[] = [
 export const FOOTER_ITEMS: NavItem[] = [
   { label: "Help Center", href: ROUTES.help, icon: CircleQuestionMark },
 ];
+
+/**
+ * The permission a page needs before it may be opened at all, keyed by path.
+ *
+ * Wider than `NAV_GROUPS`: nav items are hidden from people who may not use
+ * them, but a sub-page reached by a typed URL has no nav item to hide, so it
+ * needs its own row here. `lib/auth/route-permissions.ts` resolves a pathname
+ * against this with longest-prefix matching, so a detail route inherits its
+ * parent's row (`/products/<id>` → `products:view`) and a stricter child
+ * overrides it (`/products/import` → `products:create`).
+ *
+ * **Every value is the permission that gates that page's primary endpoint in
+ * `docs/API-ROUTES.md`, not a guess from the page's name.** Two rows are
+ * deliberately stricter than the endpoint that fills the screen, because the
+ * screen exists to manage, not to read:
+ *
+ * - `/team` is `members:invite`, not `members:view` — the Seller preset holds
+ *   `members:view` so a seller can see who recorded a sale (see the note in
+ *   `lib/auth/permissions.ts`), and gating on it would put member management
+ *   in the counter staff's hands.
+ * - `/settings` is `organization:update`, not `organization:view` — every
+ *   member holds view (it is what `GET /dashboard` runs on), so view would
+ *   gate nothing at all.
+ *
+ * Paths absent from this map are open to every member: `/overview`,
+ * `/announcements`, `/help` and `/account`. Their endpoints are gated on
+ * permissions every preset holds (`organization:view`, `announcements:view`)
+ * or on the session alone, so a row here would only add a way to be wrong.
+ */
+export const ROUTE_PERMISSIONS: Readonly<Record<string, Permission>> = {
+  [ROUTES.sales]: PERMISSIONS.SALES_VIEW,
+  [ROUTES.newSale]: PERMISSIONS.SALES_CREATE,
+  [ROUTES.products]: PERMISSIONS.PRODUCTS_VIEW,
+  [ROUTES.productImport]: PERMISSIONS.PRODUCTS_CREATE,
+  [ROUTES.customers]: PERMISSIONS.CUSTOMERS_VIEW,
+  [ROUTES.debts]: PERMISSIONS.DEBTS_VIEW,
+  [ROUTES.reports]: PERMISSIONS.REPORTS_VIEW,
+  [ROUTES.projects]: PERMISSIONS.PROJECTS_VIEW,
+  [ROUTES.team]: PERMISSIONS.MEMBERS_INVITE,
+  [ROUTES.teamRoles]: PERMISSIONS.ROLES_VIEW,
+  [ROUTES.settings]: PERMISSIONS.ORGANIZATION_UPDATE,
+};

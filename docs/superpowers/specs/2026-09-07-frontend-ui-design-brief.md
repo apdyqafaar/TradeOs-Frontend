@@ -22,7 +22,7 @@ Everything the UI shows comes from the REST API described in `Backend/docs/BACKE
 **TradeOs is a multi-tenant SaaS for small trading businesses** — shops, wholesalers, small service providers, typically in East Africa (Somali / Swahili / Arabic-speaking markets are expected; design for names and addresses in non-Latin scripts and for two currencies at once).
 
 - One **organization** = one business. A user belongs to one organization at a time. The UI never shows or asks for an organization id.
-- Every business has a **main currency** and one **exchange currency** with a rate (e.g. USD main, KES exchange at 130). Every stored amount is in the main currency; a sale or payment may be *tendered* in either, and the rate in force is frozen on that record.
+- Every business has a **main currency** and one **exchange currency** with a rate (e.g. KES main, USD exchange at 130 - the rate is units of MAIN per one unit of EXCHANGE, so one USD is worth 130 KES). Every stored amount is in the main currency; a sale or payment may be *tendered* in either, and the rate in force is frozen on that record.
 - **Money has 2 decimals, quantities up to 3.** Nothing about money is ever deleted: a mistake is corrected by a *void* or a *write-off*, and the original stays visible.
 - The frontend is **Next.js 16 (App Router) + Tailwind v4 + shadcn (base-nova style) + lucide icons**, with Geist Sans and Geist Mono already loaded. Design in those primitives.
 
@@ -93,7 +93,7 @@ The two screenshots show a dashboard in dark and light. Take the **structure**:
 - **Page heading** “Welcome back, Salung” — large, friendly, no subtitle.
 - **Stat cards**: uppercase **monospace** label (`TOTAL REVENUE`), a big monospace number (`$20,320`), a tiny sparkline of bars on the right, and a footer row (info icon · `+0.94% last year` delta in green). Cards have a subtle inset/double-border feel.
 - **Section header strip**: uppercase monospace title with an info icon, `…` menu at the right.
-- **Chart**: a bar chart drawn as **stacked small squares on a dotted grid** (LED / dot-matrix feel), segmented control `Weekly · Monthly · Yearly`, legend dots, hover tooltip listing the series, uppercase mono month labels.
+- **Chart**: a bar chart of solid bars with a rounded top (`border-radius: 6px 6px 0 0`, `max-width: 56px`) on a four-line horizontal grid, segmented control `Weekly · Monthly · Yearly`, legend dots, hover tooltip listing the series, uppercase mono month labels.
 - **Data table**: checkbox column, uppercase mono sortable headers, status pill (`● Success`), compact rows.
 - Rounded corners ~10–12 px, hairline borders, generous but not loose spacing, a mono/sans pairing where **mono = data, sans = navigation and prose**.
 
@@ -252,14 +252,16 @@ Each block: **Purpose · Who · Layout · Content · Actions · States · Rules.
 
 **Forgot / Reset password** — single email field → “If that address exists, we sent a link” (same message either way, by design); reset page has new password + confirm.
 
-**Accept invite** `/accept-invite?token=` — headline `Join {Business name}`; shows the inviter’s business name and the role; fields: name, password. Creates the account and membership in one step → `/overview`. Expired-token panel with “Ask your manager to resend the invite.”
+**Accept invite** `/accept-invite?token=` — headline `Join the team`; fields: name, password. Creates the account and membership in one step → `/overview`. Expired-token panel with “Ask your manager to resend the invite.”
+
+**Correction, 2026-09-07:** this block originally said `Join {Business name}` and promised to show the business name and the role. **The API exposes neither before acceptance.** `POST /auth/accept-invite` is the only public invite endpoint and it answers only *after* the account exists; every `/members/*invite*` route is gated on `members:invite`. Adding a lookup would turn a public route into an oracle that confirms a guessed token is live and names its business, so this is a backend decision for the owner, not a frontend workaround. The invitation email already names the business, so the person has seen it. Every failure mode — unknown token, wrong type, expired, already active, mismatch — returns the same 400 `BAD_REQUEST`, deliberately, so the endpoint cannot be probed; a banned invitee is 403 and an existing-email invitee is 409, and those two show the API's own message.
 
 ### 6.2 Onboarding `/onboarding`
 
 One centred card (same claude.ai feel), three steps with a thin progress line:
 
 1. **Your business** — `name`, `timezone` (searchable select, defaults to the browser’s zone).
-2. **Currency** — `mainCurrency` (ISO-4217 select with flag + code), `exchangeCurrency`, `exchangeRate` (mono input, helper “1 USD = 130 KES”). All three are required by `POST /organizations`.
+2. **Currency** — `mainCurrency` (ISO-4217 select with flag + code), `exchangeCurrency`, `exchangeRate` (mono input). The helper line is `1 {exchangeCurrency} = {rate} {mainCurrency}` — for a Kenyan shop taking dollars that reads “1 USD = 130 KES”, with **main KES and exchange USD**. All three are required by `POST /organizations`.
 3. **Invite your team** (optional, skippable) — up to 3 email + role rows; role select = Manager / Seller.
 
 Finish → `/overview` with a one-time welcome toast. Blocked with an inline notice if `emailVerified` is false.
@@ -271,8 +273,8 @@ Finish → `/overview` with a one-time welcome toast. Blocked with an inline not
 Layout, top to bottom:
 
 1. Serif greeting `Good morning, Amina` + muted date in the org timezone. Right: primary CTA **New sale** (if `sales:create`).
-2. **Stat cards row** (4 cards, from `sales`): `Today’s revenue`, `Today’s profit`, `Sales today` (count), `This month` (revenue). Each with the sparkline (from `trend.series`) and a muted footer line. Seller instead gets **`mySales`**: `My sales today` (count + total), `This month`, and a short list of their recent receipts.
-3. **Sales trend** section strip (the dot-matrix chart, last 7 days from `sales.trend`, segmented `Revenue · Profit · Count`).
+2. **Stat cards row** (4 cards, from `sales`): `Today’s revenue`, `Today’s profit`, `Sales today` (count), `This month` (revenue). Each with the sparkline (from `sales.trend7.series`) and a muted footer line. Seller instead gets **`mySales`**: `My sales today` (count + total), `This month`, and a short list of their recent receipts.
+3. **Sales trend** section strip (the bar chart, last 7 days from `sales.trend7`, segmented `Revenue · Profit · Count`).
 4. Two-column band:
    - **Debts** (`debts`): outstanding total, overdue amount + count, and a compact table of the top overdue customers (`customer.name`, `remaining`, `daysOverdue` badge, due date). Row → debt detail.
    - **Stock** (`stock`): low-stock count, out-of-stock count, and a 5-row list (`name`, `quantity`, `threshold`). Link → Products › Low stock.
@@ -340,7 +342,7 @@ Reserve, on every sub-page, a **`Highlights`** card at the top (serif, two or th
 - **Customers** `/reports/customers` — **top customers** (`by` `spend · balance`, limit) with a spend bar cell.
 - **Staff** `/reports/staff` — sales per member: name, count, revenue, average; a horizontal bar.
 
-Every chart uses the dot-matrix bar style; tables get an `Export` button designed but disabled (“Coming soon”).
+Every chart uses that same solid rounded-top bar style; tables get an `Export` button designed but disabled (“Coming soon”).
 
 ### 6.9 Announcements
 
@@ -371,7 +373,7 @@ Every chart uses the dot-matrix bar style; tables get an `Export` button designe
 Tabs **Business** and **Currency**; visible to `organization:update`.
 
 - **Business** — logo (upload square, 1:1, picker with `purpose: logo`), `name`, `timezone`, `phone`, `address`. Save button sticky at the bottom.
-- **Currency** — `mainCurrency`, `exchangeCurrency`, `exchangeRate` with a live example line (“1 USD = 130 KES”). An `info` callout: “Changing the rate affects new sales and payments only; existing records keep the rate they were made at.”
+- **Currency** — `mainCurrency`, `exchangeCurrency`, `exchangeRate` with a live example line `1 {exchangeCurrency} = {rate} {mainCurrency}`. An `info` callout: “Changing the rate affects new sales and payments only; existing records keep the rate they were made at.”
 
 No danger zone: the backend has no delete-organization route yet.
 
@@ -395,7 +397,7 @@ Static docs inside the shell: a left sub-nav of topics (Getting started · Selli
 |---|---|---|
 | **StatCard** | Overview, Reports | mono uppercase label · mono value · sparkline · muted footer with delta |
 | **SectionStrip** | any grouped block | mono uppercase title · info tooltip · right slot (`…` menu, segmented control) |
-| **DotMatrixBarChart** | Overview, Reports | squares-on-dotted-grid; 1–2 series; tooltip; segmented granularity |
+| **BarChart** | Overview, Reports | solid rounded-top bars (`6px 6px 0 0`, max 56px wide) on a four-line horizontal grid; 1–2 series; tooltip; segmented granularity |
 | **DataTable** | every list | mono headers, sortable, sticky header, row hover, checkbox column optional, pagination footer (`page`, `limit` 25/50/100, `total`) |
 | **StatusPill** | everywhere | see §8.3 vocabulary |
 | **Money** | everywhere | mono, 2 dp, main currency code; optional secondary line in exchange currency |
@@ -415,7 +417,7 @@ Static docs inside the shell: a left sub-nav of topics (Getting started · Selli
 
 ### 8.1 Money and numbers
 - Always mono. Two decimals, thousands separator, currency **code** not symbol (`USD 1,250.00`) — the market uses several currencies whose symbols collide.
-- A tendered-in-exchange amount shows both lines: `KES 5,000` and muted `≈ USD 38.46 @ 130`.
+- A tendered-in-exchange amount shows both lines: `USD 100.00` and muted `≈ KES 13,000.00 @ 130`. The converted line **multiplies** by the rate, matching the backend's `toMain`. Dividing is a real bug that shipped once — `exchangeRate` is units of *main* per one unit of *exchange*, which is the inverse of the way people say it out loud.
 - Quantities show up to 3 dp trimmed (`2`, `1.5`, `0.250`) followed by the `unit` (`kg`, `pcs`).
 - Never show a negative balance; the backend never produces one.
 
@@ -464,7 +466,7 @@ Static docs inside the shell: a left sub-nav of topics (Getting started · Selli
 
 Produce light **and** dark for 1–5; light only is acceptable for the rest in a first pass. Desktop 1440 wide; tablet 1024 for the counter; mobile 390 for login, overview and the sales list.
 
-1. **Foundations** — tokens sheet (colours, type scale, radii), icon set, the four status pill families, StatCard, SectionStrip, DotMatrixBarChart, DataTable, EmptyState.
+1. **Foundations** — tokens sheet (colours, type scale, radii), icon set, the four status pill families, StatCard, SectionStrip, BarChart, DataTable, EmptyState.
 2. **Shell** — sidebar (expanded, rail, drawer) with all three role variants, top bar, unverified strip, avatar menu, org menu.
 3. **Auth** — login, 2FA, register + “check your email”, forgot/reset, accept invite, onboarding (3 steps).
 4. **Overview** — Manager variant, Seller variant, first-steps empty variant.

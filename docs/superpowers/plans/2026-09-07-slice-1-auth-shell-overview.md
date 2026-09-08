@@ -841,7 +841,17 @@ git commit -m "feat(shell): match the design canvas measurements exactly"
 
 - [ ] **Step 1: Read the backend section builders**
 
-Read every file in `../Backend/src/services/dashboard/`. Each `build*Section` function's return object is the wire shape. Do not guess field names — `sales` returns `{ today: { revenue, grossProfit, count }, thisMonth: {…}, trend: { granularity, series: [{ bucket, revenue, profit, count }] } }`, `debts` returns `{ outstanding, overdueAmount, overdueCount, overdue: [{ debtId, customer: { id, name, phone }, principal, remaining, dueDate, daysOverdue }] }`, `stock` returns `{ lowStockCount, outOfStockCount, lowStock: [{ productId, name, quantity, threshold }] }`, `mySales` returns `{ today: { count, total }, thisMonth: {…}, recent: [{ id, number, total, paymentStatus, createdAt }] }`, `staff` returns `{ today: [{ memberId, name, count, revenue }] }`, `projects` returns `{ inProgressCount, dueSoon: [{ id, title, dueDate, progress }] }`, `team` returns `{ activeCount, invitedCount }`, `me` returns `{ memberId, name, email, role, permissions }`, `organization` returns `{ id, name, logo, currency }`, `announcements` returns an array of `{ id, title, pinned, createdAt, author }`.
+Read every file in `../Backend/src/services/dashboard/`. Each `build*Section` function's return object is the wire shape.
+
+**This task is complete — the verified `DashboardSections` type is in `features/dashboard/types.ts`.** Five field names differ from an earlier draft of this step and are worth naming, because each was a silent `undefined` waiting to happen:
+
+- **`sales.trend7`, not `sales.trend`** (`sales.section.ts:39`). This one bites hardest: `sections.sales.trend` type-errors now, but read as `undefined` before the type existed.
+- **`debts` also returns `dueWithin7Days: { count, amount }`** (`debts.section.ts:105`) — free data for the Debts panel.
+- **`me.role` is `{ id, name }`**, an object, not a name string.
+- **`organization` also returns `timezone`**, and `currency` is `{ main, exchange, rate } | null`, not a code. The `null` case is real — a business with no currency config has no code to pass to `formatMoney`, so do not fall back to `"USD"`.
+- **`stock.lowStock[].threshold` is `number | null`.**
+
+Two permission facts that shape the Overview: `team` needs `members:view` **and** `members:invite` together, so a Seller is excluded despite holding `members:view`; and `mySales` is gated on `sales:create`, an action permission, so a Manager receives **both** `mySales` and `sales` — they are not an either/or role switch.
 
 - [ ] **Step 2: Write the failing test**
 
@@ -1055,10 +1065,12 @@ describe("Overview", () => {
       data: {
         available: ["organization", "me", "sales"],
         sections: {
+          // NOTE: `trend7`, not `trend` — verified against
+          // ../Backend/src/services/dashboard/sales.section.ts:39.
           sales: {
             today: { revenue: 0, grossProfit: 0, count: 0 },
             thisMonth: { revenue: 0, grossProfit: 0, count: 0 },
-            trend: { granularity: "day", series: [] },
+            trend7: { granularity: "day", series: [] },
           },
         },
       },
@@ -1118,10 +1130,145 @@ git commit -m "feat(dashboard): the Overview page"
 
 ---
 
+### Task 12: Route protection — permissions and the no-organization case
+
+The foundation shipped `RequirePermission` but nothing calls it, and only the 8 top-level nav items carry a permission. So today a Seller who types `/reports` into the address bar reaches the page, fires a request and gets a bare 403; and a user who registered but has no business yet is waved past `proxy.ts` into `/overview`, where `requireMember` fails.
+
+**Why this is client-side.** `proxy.ts` cannot do it: it would have to fetch `/auth/me` on every request, and the Next 16 Proxy docs say plainly that Proxy is not a session or authorization solution and must not be used for slow data fetching. The real enforcement is the API's 403 — this task is the UX layer that stops a person reaching a screen that can only fail, and shows them something calm when they do.
+
+**Files:**
+- Create: `lib/auth/route-permissions.ts` (+ `.test.ts`), `components/shared/forbidden-screen.tsx`, `components/layout/route-guard.tsx`
+- Modify: `config/routes.ts` (add the permission map), `app/(app)/layout.tsx` (wrap children)
+- Test: `lib/auth/route-permissions.test.ts`
+
+**Interfaces:**
+- Consumes: `ROUTES`, `PERMISSIONS`, `Permission`, `useSession`, `RequirePermission`.
+- Produces: `ROUTE_PERMISSIONS: Record<string, Permission>`, `resolveRoutePermission(pathname): Permission | null`, `<RouteGuard>{children}</RouteGuard>`, `<ForbiddenScreen />`.
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+// lib/auth/route-permissions.test.ts
+import { describe, expect, it } from "vitest";
+import { PERMISSIONS } from "@/lib/auth/permissions";
+import { resolveRoutePermission } from "./route-permissions";
+
+describe("resolveRoutePermission", () => {
+  it("maps a top-level page to its permission", () => {
+    expect(resolveRoutePermission("/reports")).toBe(PERMISSIONS.REPORTS_VIEW);
+    expect(resolveRoutePermission("/products")).toBe(PERMISSIONS.PRODUCTS_VIEW);
+  });
+
+  it("gives a sub-route its own stricter permission, not its parent's", () => {
+    // A Seller holds sales:view but not sales:void; they may open /sales but
+    // must not reach /sales/new without sales:create.
+    expect(resolveRoutePermission("/sales/new")).toBe(PERMISSIONS.SALES_CREATE);
+    expect(resolveRoutePermission("/products/import")).toBe(PERMISSIONS.PRODUCTS_CREATE);
+    expect(resolveRoutePermission("/team/roles")).toBe(PERMISSIONS.ROLES_VIEW);
+  });
+
+  it("falls back to the parent's permission for a detail route", () => {
+    expect(resolveRoutePermission("/products/64f0c9a2b1e4d5a6c7b8e9f0")).toBe(
+      PERMISSIONS.PRODUCTS_VIEW,
+    );
+    expect(resolveRoutePermission("/reports/sales")).toBe(PERMISSIONS.REPORTS_VIEW);
+  });
+
+  it("does not treat a shared prefix as a match", () => {
+    expect(resolveRoutePermission("/products-import")).toBeNull();
+  });
+
+  it("returns null for pages everyone may see", () => {
+    for (const path of ["/overview", "/announcements", "/help", "/account"]) {
+      expect(resolveRoutePermission(path), path).toBeNull();
+    }
+  });
+});
+```
+
+- [ ] **Step 2: Run it and watch it fail**
+
+Run: `bunx vitest run lib/auth/route-permissions.test.ts`
+Expected: FAIL — `Cannot find module './route-permissions'`.
+
+- [ ] **Step 3: Build the map and the resolver**
+
+In `config/routes.ts`, add `ROUTE_PERMISSIONS` covering **every** guarded path, not just nav items. Derive the values from `docs/API-ROUTES.md` — the permission that gates the page's primary endpoint:
+
+| Path | Permission |
+|---|---|
+| `/sales` | `SALES_VIEW` |
+| `/sales/new` | `SALES_CREATE` |
+| `/products` | `PRODUCTS_VIEW` |
+| `/products/import` | `PRODUCTS_CREATE` |
+| `/customers` | `CUSTOMERS_VIEW` |
+| `/debts` | `DEBTS_VIEW` |
+| `/reports` | `REPORTS_VIEW` |
+| `/projects` | `PROJECTS_VIEW` |
+| `/team` | `MEMBERS_INVITE` |
+| `/team/roles` | `ROLES_VIEW` |
+| `/settings` | `ORGANIZATION_UPDATE` |
+
+`/overview`, `/announcements`, `/help` and `/account` are ungated — every member may see them.
+
+`resolveRoutePermission` uses **longest-prefix matching with a `/` boundary**, the same rule as `resolveActiveHref`: `/products/import` must beat `/products`, and `/products-import` must match neither. Reuse that logic rather than writing a second, subtly different matcher — extract it if that is cleanest, and say so in a comment.
+
+- [ ] **Step 4: Build `ForbiddenScreen` and `RouteGuard`**
+
+`forbidden-screen.tsx`: the calm full-page refusal brief §8.4 asks for — a centred column with a `Lock` icon, serif "You don't have access to this", one muted line ("Ask an owner or manager if you need it."), and a `Back to overview` button. No error styling; this is not a failure, it is a boundary.
+
+`route-guard.tsx` (`"use client"`) does three things in order, and the order matters:
+
+```tsx
+const { data, isPending } = useSession();
+const pathname = usePathname();
+
+// 1. Session still resolving — render nothing rather than flashing a refusal.
+if (isPending) return null;
+
+// 2. Signed in but no business yet. `requireMember` would fail on every
+//    endpoint in here, so send them to the one screen that fixes it. The
+//    proxy cannot catch this: it sees a valid cookie and nothing more.
+if (data && !data.organization) {
+  redirect(ROUTES.onboarding);
+}
+
+// 3. The permission gate.
+const permission = resolveRoutePermission(pathname);
+if (!permission) return children;
+return (
+  <RequirePermission permission={permission} fallback={<ForbiddenScreen />}>
+    {children}
+  </RequirePermission>
+);
+```
+
+Wrap `{children}` in `app/(app)/layout.tsx` with `<RouteGuard>`. The layout stays a Server Component; `RouteGuard` is the client boundary.
+
+- [ ] **Step 5: Run the tests**
+
+Run: `bunx vitest run lib/auth/route-permissions.test.ts`
+Expected: PASS, 5 tests.
+
+- [ ] **Step 6: Verify by hand**
+
+With the API running, sign in as a **Seller** and type `/reports`, `/team` and `/settings` into the address bar. Each must show the ForbiddenScreen, not a crash and not a bare 403 body. Then sign in as a Manager and confirm all three open normally.
+
+- [ ] **Step 7: Commit**
+
+```bash
+bun run check
+git add lib/auth components/shared/forbidden-screen.tsx components/layout/route-guard.tsx config/routes.ts app/\(app\)/layout.tsx
+git commit -m "feat(auth): guard routes by permission and route new users to onboarding"
+```
+
+---
+
 ## Done when
 
 - A new person can register, verify their email, create a business, sign in, and see a real Overview.
 - An invited person can accept an invitation and land in the same shell with a Seller's seven nav items.
+- A Seller who types `/reports`, `/team` or `/settings` into the address bar gets the ForbiddenScreen, and a signed-in user with no business is sent to onboarding rather than to a failing dashboard.
 - `bun run check` passes and `bun run build` succeeds.
 - `/login`, `/overview` (manager, light and dark) and `/overview` (seller) match artboards `1f`, `1c`, `1d` and `1e` at 1440px.
 

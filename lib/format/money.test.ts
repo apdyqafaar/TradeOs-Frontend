@@ -49,18 +49,23 @@ describe("formatQuantity", () => {
 });
 
 describe("formatExchange", () => {
-  it("gives the tendered line and the conversion back to the main currency", () => {
-    // USD main, KES exchange at 130: KES 5,000 is USD 38.46.
-    expect(formatExchange(5000, "KES", 130, "USD")).toEqual({
-      tendered: "KES 5,000.00",
-      converted: "≈ USD 38.46 @ 130",
+  it("multiplies by the rate, the same direction as the backend's toMain", () => {
+    // `exchangeRate` is units of MAIN per one unit of EXCHANGE
+    // (../Backend/src/lib/money.ts). A Kenyan shop keeps books in KES and
+    // takes dollars: main KES, exchange USD, rate 130. So USD 100 tendered
+    // is KES 13,000 — which is exactly what the API will price the sale at.
+    // Dividing here (the earlier bug) printed KES 0.77 on the receipt.
+    expect(formatExchange(100, "USD", 130, "KES")).toEqual({
+      tendered: "USD 100.00",
+      converted: "≈ KES 13,000.00 @ 130",
     });
   });
 
   it("shows a fractional rate without padding it", () => {
-    expect(formatExchange(100, "EUR", 0.92, "USD")).toEqual({
+    // Main USD, exchange EUR at 1.09: EUR 100 is USD 109.
+    expect(formatExchange(100, "EUR", 1.09, "USD")).toEqual({
       tendered: "EUR 100.00",
-      converted: "≈ USD 108.70 @ 0.92",
+      converted: "≈ USD 109.00 @ 1.09",
     });
   });
 
