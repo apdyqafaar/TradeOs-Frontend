@@ -253,13 +253,19 @@
   --sidebar-ring: oklch(0.7165 0.1144 40.51);
 
   /* Dark counterparts of the canvas extras: #75736D, #A19F98, #2F2D29,
-     #3A3833 (used for both --surface-3 and --border-strong, as the canvas
-     does), and the four *-strong tones lifted to read on their dark tints. */
+     #3A3833, #565349, and the four *-strong tones lifted to read on their
+     dark tints.
+
+     --border-strong is #565349 here, NOT #3A3833. It first shipped equal to
+     --border, which made every "strong" hairline identical to a plain one -
+     the breadcrumb chevron effectively vanished in dark mode. The canvas
+     draws it at #565349 (artboard `1d`, docs/design/TradeOs-UI.dc.html:2360),
+     a full step lighter than the border it is meant to outrank. */
   --muted-2: oklch(0.5488 0.0058 92.36);
   --muted-3: oklch(0.6871 0.0075 92.71);
   --surface-2: oklch(0.2978 0.0076 84.59);
   --surface-3: oklch(0.341 0.009 88.74);
-  --border-strong: oklch(0.341 0.009 88.74);
+  --border-strong: oklch(0.4456 0.0167 94.31);
   --success-strong: oklch(0.7201 0.0807 149.25);
   --warning-strong: oklch(0.7936 0.1021 78.15);
   --info-strong: oklch(0.7097 0.0554 251.97);

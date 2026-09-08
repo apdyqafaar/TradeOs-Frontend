@@ -83,10 +83,16 @@ function humanizeSegment(segment: string): string {
  * One or two letters for an avatar square. Names arrive in Somali, Swahili and
  * Arabic scripts, so this splits on whitespace and takes whole code points
  * rather than assuming a Latin first/last name.
+ *
+ * An empty name yields an empty string, not a `"?"` placeholder: every caller
+ * already substitutes a real fallback before calling ("Your business",
+ * "Account"), so a name is only ever blank when the session itself is, and a
+ * lone question mark in the avatar reads as an error rather than as loading.
+ * `nav-utils.test.ts` pins this.
  */
 export function getInitials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return "?";
+  if (words.length === 0) return "";
 
   const first = [...words[0]][0] ?? "";
   const last = words.length > 1 ? ([...words[words.length - 1]][0] ?? "") : "";

@@ -16,7 +16,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <MobileNav />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
-        <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 py-6 lg:px-8 lg:py-8">
+        {/* 32px of padding and a 24px column gap at `lg`, which reproduces the
+            1200px content region of artboard `1c` exactly at a 1440 viewport.
+            `max-w-[1280px]` stops an ultrawide screen from stretching it. */}
+        <main className="mx-auto flex w-full max-w-[1280px] flex-1 flex-col gap-6 p-4 lg:p-8">
           {/* The guard, not the layout, is the client boundary: it needs the
               session to know whether this person has a business and whether
               they may open this path. */}
