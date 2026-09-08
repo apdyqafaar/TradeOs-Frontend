@@ -122,6 +122,10 @@ same-origin. That keeps the session cookie first-party, removes CORS entirely, a
 
 ## Conventions that matter
 
+- **Check `docs/API-ROUTES.md` before writing any service function.** It lists all 111 endpoints
+  with their exact paths and permission gates, extracted from the backend source. If a path is not
+  in it, the endpoint does not exist — do not invent one. Gate the UI on the same permission string
+  the table names.
 - **Branch on `code`, never on `message`.** Messages are for people and change freely. Codes are in
   `API_ERROR_CODE` in `lib/api/errors.ts`.
 - **Never send an organization id.** The API resolves the tenant from the caller's session. If you
@@ -159,9 +163,10 @@ Vitest + happy-dom + Testing Library. Config is `vitest.config.mts` (**`.mts` de
 
 ## Open items for the owner
 
-- **Primary-button contrast is 3.0:1** (#D97757 with off-white text), below WCAG AA for small text.
-  Kept because the brief names that accent and it is the claude.ai look; dark mode inverts to 6.6:1.
-  Needs a human decision: darken the accent, or use it only for large text and surfaces.
+- **Contrast: design fidelity wins — decided 2026-09-07, not open.** The primary button (#D97757
+  with off-white text, 3.0:1) and the active nav pill (#D97757 on #F6E7DF, 2.6:1) are below WCAG AA
+  for small text. The owner chose to match the design canvas exactly. `app/globals.test.ts` locks
+  both values — if it fails, someone is "fixing" the contrast. Ask before changing it.
 - **`typedRoutes` is off** in `next.config.ts` — it would type `Link href` to routes that exist, and
   most paths in `config/routes.ts` have no page yet. Turn it on once the route tree is complete.
 - **A dead network is not retried** (`ApiError` uses status 0, which the retry policy treats as

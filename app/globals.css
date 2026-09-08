@@ -78,6 +78,15 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-muted-2: var(--muted-2);
+  --color-muted-3: var(--muted-3);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border-strong: var(--border-strong);
+  --color-success-strong: var(--success-strong);
+  --color-warning-strong: var(--warning-strong);
+  --color-info-strong: var(--info-strong);
+  --color-destructive-strong: var(--destructive-strong);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -98,14 +107,15 @@
   --popover: oklch(0.985 0.0041 91.45);
   --popover-foreground: oklch(0.2357 0.0024 67.71);
 
-  /* #D97757 terracotta. Its foreground is a warm off-white, not #FFF, and
-     scores 3.0:1 - the claude.ai look the brief asks for trades AA on the
-     primary button for the accent it names. #A9502F is the same hue deepened
-     until it clears 4.5:1 on the #F6E7DF tint, so soft-backed text uses that. */
+  /* #D97757 terracotta. Owner decision 2026-09-07: the design canvas wins over
+     WCAG contrast here. --primary-foreground scores 3.0:1 on it, and the accent
+     on --primary-soft scores 2.6:1 - both are exactly what the canvas renders
+     (docs/design/TradeOs-UI.dc.html:2102). app/globals.test.ts locks these
+     values; do not deepen them to pass AA without asking. */
   --primary: oklch(0.6724 0.1308 38.76);
   --primary-foreground: oklch(0.9928 0.0042 56.38);
   --primary-soft: oklch(0.9377 0.0196 50.15);
-  --primary-soft-foreground: oklch(0.5368 0.1262 40.29);
+  --primary-soft-foreground: oklch(0.6724 0.1308 38.76);
 
   /* #F0EEE6 surface-2: table headers, hover, inset areas. --accent is that
      hover surface, NOT the brand accent - the brand accent is --primary. */
@@ -152,16 +162,33 @@
   --radius: 0.625rem; /* 10px - cards and inputs (section 3.2) */
 
   /* The sidebar sits on the surface tone, one step off the page ground, and
-     its --sidebar-accent pair is the active-item pill: accent-soft behind
-     deepened terracotta. */
+     its --sidebar-accent pair is the active-item pill: accent-soft behind the
+     terracotta itself, exactly as the canvas draws it. */
   --sidebar: oklch(0.985 0.0041 91.45);
   --sidebar-foreground: oklch(0.2357 0.0024 67.71);
   --sidebar-primary: oklch(0.6724 0.1308 38.76);
   --sidebar-primary-foreground: oklch(0.9928 0.0042 56.38);
   --sidebar-accent: oklch(0.9377 0.0196 50.15);
-  --sidebar-accent-foreground: oklch(0.5368 0.1262 40.29);
+  --sidebar-accent-foreground: oklch(0.6724 0.1308 38.76);
   --sidebar-border: oklch(0.9088 0.0123 96.43);
   --sidebar-ring: oklch(0.6724 0.1308 38.76);
+
+  /* Canvas tones with no shadcn equivalent. --muted-2 (#8A8880) and --muted-3
+     (#A9A7A0) are the two greys below --muted-foreground: the "Business" label,
+     search placeholder, nav group headings and the legal footer. --surface-2
+     (#E8E6DE) is the segmented-control track, --surface-3 (#D8D6CD) a pressed
+     fill, --border-strong (#C9C7BE) the breadcrumb chevron. The four *-strong
+     tones are text sitting on their own soft tint - the unverified-email strip
+     is --warning-strong on --warning-soft. */
+  --muted-2: oklch(0.6262 0.0069 92.5);
+  --muted-3: oklch(0.7124 0.0068 92.75);
+  --surface-2: oklch(0.9273 0.0089 92.14);
+  --surface-3: oklch(0.8712 0.0104 94.28);
+  --border-strong: oklch(0.8192 0.0119 95.09);
+  --success-strong: oklch(0.4992 0.0819 149.26);
+  --warning-strong: oklch(0.4353 0.0761 79.03);
+  --info-strong: oklch(0.4288 0.0466 253.4);
+  --destructive-strong: oklch(0.4318 0.1418 29.66);
 }
 
 .dark {
@@ -224,6 +251,19 @@
   --sidebar-accent-foreground: oklch(0.7165 0.1144 40.51);
   --sidebar-border: oklch(0.341 0.009 88.74);
   --sidebar-ring: oklch(0.7165 0.1144 40.51);
+
+  /* Dark counterparts of the canvas extras: #75736D, #A19F98, #2F2D29,
+     #3A3833 (used for both --surface-3 and --border-strong, as the canvas
+     does), and the four *-strong tones lifted to read on their dark tints. */
+  --muted-2: oklch(0.5488 0.0058 92.36);
+  --muted-3: oklch(0.6871 0.0075 92.71);
+  --surface-2: oklch(0.2978 0.0076 84.59);
+  --surface-3: oklch(0.341 0.009 88.74);
+  --border-strong: oklch(0.341 0.009 88.74);
+  --success-strong: oklch(0.7201 0.0807 149.25);
+  --warning-strong: oklch(0.7936 0.1021 78.15);
+  --info-strong: oklch(0.7097 0.0554 251.97);
+  --destructive-strong: oklch(0.6833 0.1479 29.7);
 }
 
 @layer base {
