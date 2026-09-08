@@ -1,0 +1,158 @@
+import {
+  ChartNoAxesColumn,
+  CircleQuestionMark,
+  FolderKanban,
+  HandCoins,
+  LayoutDashboard,
+  type LucideIcon,
+  Megaphone,
+  Package,
+  Receipt,
+  Settings,
+  Users,
+  UsersRound,
+} from "lucide-react";
+import { PERMISSIONS, type Permission } from "@/lib/auth/permissions";
+
+/**
+ * Every path in the product, in one place, so a route rename is one edit and
+ * `<Link href="/sales">` never drifts from the folder it points at. Dynamic
+ * segments are functions rather than template strings at the call site, which
+ * is what keeps the id in one position instead of five.
+ */
+export const ROUTES = {
+  // Outside the shell (section 5).
+  login: "/login",
+  twoFactor: "/login/2fa",
+  register: "/register",
+  verifyEmail: "/verify-email",
+  forgotPassword: "/forgot-password",
+  resetPassword: "/reset-password",
+  acceptInvite: "/accept-invite",
+  onboarding: "/onboarding",
+  /** The client-facing share link: no shell, no session, token in the path. */
+  publicProject: (token: string) => `/p/${token}`,
+
+  // Inside the shell.
+  overview: "/overview",
+  sales: "/sales",
+  newSale: "/sales/new",
+  sale: (id: string) => `/sales/${id}`,
+  products: "/products",
+  product: (id: string) => `/products/${id}`,
+  productImport: "/products/import",
+  customers: "/customers",
+  customer: (id: string) => `/customers/${id}`,
+  debts: "/debts",
+  debt: (id: string) => `/debts/${id}`,
+  reports: "/reports",
+  reportsSales: "/reports/sales",
+  reportsProducts: "/reports/products",
+  reportsDebts: "/reports/debts",
+  reportsCustomers: "/reports/customers",
+  reportsStaff: "/reports/staff",
+  announcements: "/announcements",
+  projects: "/projects",
+  project: (id: string) => `/projects/${id}`,
+  /** Members live at /team; Roles is its sub-page. */
+  team: "/team",
+  teamRoles: "/team/roles",
+  settings: "/settings",
+  account: "/account",
+  help: "/help",
+} as const;
+
+/**
+ * `permission` omitted means the item is always visible. When present it is a
+ * single permission the caller must hold; the sidebar drops the item entirely
+ * rather than disabling it, because the brief (section 1.1) is explicit that a
+ * Seller must not learn that Reports exists.
+ */
+export type NavItem = {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  permission?: Permission;
+};
+
+export type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+export const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Main",
+    items: [
+      { label: "Overview", href: ROUTES.overview, icon: LayoutDashboard },
+      {
+        label: "Sales",
+        href: ROUTES.sales,
+        icon: Receipt,
+        permission: PERMISSIONS.SALES_VIEW,
+      },
+      {
+        label: "Products",
+        href: ROUTES.products,
+        icon: Package,
+        permission: PERMISSIONS.PRODUCTS_VIEW,
+      },
+      {
+        label: "Customers",
+        href: ROUTES.customers,
+        icon: Users,
+        permission: PERMISSIONS.CUSTOMERS_VIEW,
+      },
+      {
+        label: "Debts",
+        href: ROUTES.debts,
+        icon: HandCoins,
+        permission: PERMISSIONS.DEBTS_VIEW,
+      },
+      {
+        label: "Reports",
+        href: ROUTES.reports,
+        icon: ChartNoAxesColumn,
+        permission: PERMISSIONS.REPORTS_VIEW,
+      },
+    ],
+  },
+  {
+    label: "Team",
+    items: [
+      { label: "Announcements", href: ROUTES.announcements, icon: Megaphone },
+      {
+        label: "Projects",
+        href: ROUTES.projects,
+        icon: FolderKanban,
+        permission: PERMISSIONS.PROJECTS_VIEW,
+      },
+    ],
+  },
+  {
+    label: "Manage",
+    items: [
+      {
+        label: "Members",
+        href: ROUTES.team,
+        icon: UsersRound,
+        // Gated on MEMBERS_INVITE, not members:view. The backend's Seller
+        // preset holds members:view so a seller can see who recorded a sale
+        // (see the note in lib/auth/permissions.ts), so gating on view would
+        // put the whole member-management screen in the counter staff's
+        // sidebar. No Seller holds members:invite.
+        permission: PERMISSIONS.MEMBERS_INVITE,
+      },
+      {
+        label: "Settings",
+        href: ROUTES.settings,
+        icon: Settings,
+        permission: PERMISSIONS.ORGANIZATION_UPDATE,
+      },
+    ],
+  },
+];
+
+export const FOOTER_ITEMS: NavItem[] = [
+  { label: "Help Center", href: ROUTES.help, icon: CircleQuestionMark },
+];

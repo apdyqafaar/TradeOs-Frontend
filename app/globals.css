@@ -1,3 +1,21 @@
+/*
+ * TradeOs palette - warm, paper-like, one terracotta accent.
+ *
+ * Every value below is the OKLCH conversion of a hex in section 3.2 of
+ * `docs/superpowers/specs/2026-09-07-frontend-ui-design-brief.md`. It is NOT
+ * the shadcn neutral-grey default and must not be "corrected" back to it: the
+ * cream ground (#F5F4EE) and warm charcoal (#1C1B19) are the product's
+ * identity, and the brief forbids pure #FFF / #000 anywhere.
+ *
+ * Two token families sit on top of shadcn's set:
+ *   --primary-soft, --success, --warning, --info, --destructive-soft ...
+ *     Status pills (section 8.3) need a tint background plus a foreground that
+ *     reads on it, which shadcn's lone --destructive cannot express.
+ *   *-soft-foreground
+ *     The brief's solid status hues score 2.7-4.3:1 on their own soft tints,
+ *     so pill text uses a darkened sibling of the same hue instead.
+ */
+
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -7,9 +25,13 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  /* The scaffold shipped `--font-sans: var(--font-sans)`, which resolves to
+     nothing - Geist was loaded but never applied. Point at the real variable
+     that `app/layout.tsx` puts on <html>. */
+  --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-serif: var(--font-instrument-serif);
+  --font-heading: var(--font-geist-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -27,6 +49,21 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-destructive-soft-foreground: var(--destructive-soft-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-soft: var(--success-soft);
+  --color-success-soft-foreground: var(--success-soft-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-soft-foreground: var(--warning-soft-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-soft: var(--info-soft);
+  --color-info-soft-foreground: var(--info-soft-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -35,6 +72,8 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-foreground: var(--primary-soft-foreground);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -49,72 +88,142 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* #F5F4EE cream ground, #1F1E1D warm near-black. */
+  --background: oklch(0.9663 0.008 98.88);
+  --foreground: oklch(0.2357 0.0024 67.71);
+
+  /* #FBFAF7 surface: cards, popovers, sidebar. */
+  --card: oklch(0.985 0.0041 91.45);
+  --card-foreground: oklch(0.2357 0.0024 67.71);
+  --popover: oklch(0.985 0.0041 91.45);
+  --popover-foreground: oklch(0.2357 0.0024 67.71);
+
+  /* #D97757 terracotta. Its foreground is a warm off-white, not #FFF, and
+     scores 3.0:1 - the claude.ai look the brief asks for trades AA on the
+     primary button for the accent it names. #A9502F is the same hue deepened
+     until it clears 4.5:1 on the #F6E7DF tint, so soft-backed text uses that. */
+  --primary: oklch(0.6724 0.1308 38.76);
+  --primary-foreground: oklch(0.9928 0.0042 56.38);
+  --primary-soft: oklch(0.9377 0.0196 50.15);
+  --primary-soft-foreground: oklch(0.5368 0.1262 40.29);
+
+  /* #F0EEE6 surface-2: table headers, hover, inset areas. --accent is that
+     hover surface, NOT the brand accent - the brand accent is --primary. */
+  --secondary: oklch(0.9485 0.0109 95.17);
+  --secondary-foreground: oklch(0.2357 0.0024 67.71);
+  --muted: oklch(0.9485 0.0109 95.17);
+  --muted-foreground: oklch(0.5341 0.0078 97.45); /* #6E6D68 */
+  --accent: oklch(0.9485 0.0109 95.17);
+  --accent-foreground: oklch(0.2357 0.0024 67.71);
+
+  /* #C0392B danger on #F6E0DC, #4F8A5B success on #E4EFE5,
+     #B8862B warning on #F5ECD6, #5B7A9D info on #E3EAF2. */
+  --destructive: oklch(0.5433 0.174 29.7);
+  --destructive-foreground: oklch(0.985 0.0041 91.45);
+  --destructive-soft: oklch(0.9234 0.0249 29.93);
+  --destructive-soft-foreground: oklch(0.4801 0.1552 29.71);
+  --success: oklch(0.5801 0.095 149.25);
+  --success-foreground: oklch(0.985 0.0041 91.45);
+  --success-soft: oklch(0.9411 0.0177 148.1);
+  --success-soft-foreground: oklch(0.4992 0.0819 149.26);
+  --warning: oklch(0.6536 0.1201 78.15);
+  /* Dark text on the amber: cream scores 3.1:1 on it, charcoal 5.1:1. */
+  --warning-foreground: oklch(0.2357 0.0024 67.71);
+  --warning-soft: oklch(0.9443 0.0306 88.37);
+  --warning-soft-foreground: oklch(0.53 0.0959 78.02);
+  --info: oklch(0.5697 0.0651 251.97);
+  --info-foreground: oklch(0.985 0.0041 91.45);
+  --info-soft: oklch(0.9341 0.0132 251.56);
+  --info-soft-foreground: oklch(0.4838 0.0583 251.65);
+
+  /* #E3E1D8 hairline; the focus ring is the accent (section 3.2). */
+  --border: oklch(0.9088 0.0123 96.43);
+  --input: oklch(0.9088 0.0123 96.43);
+  --ring: oklch(0.6724 0.1308 38.76);
+
+  /* chart-1 is the accent and chart-2 the muted text, which is the one- and
+     two-series pairing the brief specifies; 3-5 are info, warning, success. */
+  --chart-1: oklch(0.6724 0.1308 38.76);
+  --chart-2: oklch(0.5341 0.0078 97.45);
+  --chart-3: oklch(0.5697 0.0651 251.97);
+  --chart-4: oklch(0.6536 0.1201 78.15);
+  --chart-5: oklch(0.5801 0.095 149.25);
+
+  --radius: 0.625rem; /* 10px - cards and inputs (section 3.2) */
+
+  /* The sidebar sits on the surface tone, one step off the page ground, and
+     its --sidebar-accent pair is the active-item pill: accent-soft behind
+     deepened terracotta. */
+  --sidebar: oklch(0.985 0.0041 91.45);
+  --sidebar-foreground: oklch(0.2357 0.0024 67.71);
+  --sidebar-primary: oklch(0.6724 0.1308 38.76);
+  --sidebar-primary-foreground: oklch(0.9928 0.0042 56.38);
+  --sidebar-accent: oklch(0.9377 0.0196 50.15);
+  --sidebar-accent-foreground: oklch(0.5368 0.1262 40.29);
+  --sidebar-border: oklch(0.9088 0.0123 96.43);
+  --sidebar-ring: oklch(0.6724 0.1308 38.76);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* #1C1B19 warm charcoal, #EDEBE5 text, #262421 surface, #2F2D29 surface-2. */
+  --background: oklch(0.2225 0.0041 84.59);
+  --foreground: oklch(0.94 0.0083 91.49);
+  --card: oklch(0.2614 0.0063 78.22);
+  --card-foreground: oklch(0.94 0.0083 91.49);
+  --popover: oklch(0.2614 0.0063 78.22);
+  --popover-foreground: oklch(0.94 0.0083 91.49);
+
+  /* #E08A6B lifted terracotta over #3B2B25. Charcoal on the lifted accent is
+     6.6:1, so the button foreground inverts here rather than staying cream. */
+  --primary: oklch(0.7165 0.1144 40.51);
+  --primary-foreground: oklch(0.2225 0.0041 84.59);
+  --primary-soft: oklch(0.3057 0.0262 41.5);
+  --primary-soft-foreground: oklch(0.7165 0.1144 40.51);
+
+  --secondary: oklch(0.2978 0.0076 84.59);
+  --secondary-foreground: oklch(0.94 0.0083 91.49);
+  --muted: oklch(0.2978 0.0076 84.59);
+  --muted-foreground: oklch(0.7021 0.0103 93.62); /* #A19F98 */
+  --accent: oklch(0.2978 0.0076 84.59);
+  --accent-foreground: oklch(0.94 0.0083 91.49);
+  /* Status hues keep their light-mode angle, lift ~0.14 L and shed ~15% chroma
+     so they sit on charcoal without glowing; the soft tints become 18%
+     translucent washes of the same colour rather than opaque pastels. */
+  --destructive: oklch(0.6833 0.1479 29.7);
+  --destructive-foreground: oklch(0.2225 0.0041 84.59);
+  --destructive-soft: oklch(0.6833 0.1479 29.7 / 18%);
+  --destructive-soft-foreground: oklch(0.6833 0.1479 29.7);
+  --success: oklch(0.7201 0.0807 149.25);
+  --success-foreground: oklch(0.2225 0.0041 84.59);
+  --success-soft: oklch(0.7201 0.0807 149.25 / 18%);
+  --success-soft-foreground: oklch(0.7201 0.0807 149.25);
+  --warning: oklch(0.7936 0.1021 78.15);
+  --warning-foreground: oklch(0.2225 0.0041 84.59);
+  --warning-soft: oklch(0.7936 0.1021 78.15 / 18%);
+  --warning-soft-foreground: oklch(0.7936 0.1021 78.15);
+  --info: oklch(0.7097 0.0554 251.97);
+  --info-foreground: oklch(0.2225 0.0041 84.59);
+  --info-soft: oklch(0.7097 0.0554 251.97 / 18%);
+  --info-soft-foreground: oklch(0.7097 0.0554 251.97);
+
+  /* #3A3833, opaque rather than shadcn's white-at-10%, so it stays warm. */
+  --border: oklch(0.341 0.009 88.74);
+  --input: oklch(0.341 0.009 88.74);
+  --ring: oklch(0.7165 0.1144 40.51);
+
+  --chart-1: oklch(0.7165 0.1144 40.51);
+  --chart-2: oklch(0.7021 0.0103 93.62);
+  --chart-3: oklch(0.7097 0.0554 251.97);
+  --chart-4: oklch(0.7936 0.1021 78.15);
+  --chart-5: oklch(0.7201 0.0807 149.25);
+  --sidebar: oklch(0.2614 0.0063 78.22);
+  --sidebar-foreground: oklch(0.94 0.0083 91.49);
+  --sidebar-primary: oklch(0.7165 0.1144 40.51);
+  --sidebar-primary-foreground: oklch(0.2225 0.0041 84.59);
+  --sidebar-accent: oklch(0.3057 0.0262 41.5);
+  --sidebar-accent-foreground: oklch(0.7165 0.1144 40.51);
+  --sidebar-border: oklch(0.341 0.009 88.74);
+  --sidebar-ring: oklch(0.7165 0.1144 40.51);
 }
 
 @layer base {
@@ -126,5 +235,12 @@
   }
   html {
     @apply font-sans;
+  }
+  /* Money and quantities are compared column-to-column all over the product
+     (section 8.1), so every mono run gets tabular figures. */
+  .font-mono,
+  code,
+  kbd {
+    font-variant-numeric: tabular-nums;
   }
 }

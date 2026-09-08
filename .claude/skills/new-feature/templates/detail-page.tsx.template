@@ -1,0 +1,241 @@
+/* ============================================================================
+ * FILE: app/(app)/__resources-kebab__/[id]/page.tsx
+ * Delete this banner after substituting.
+ * ==========================================================================*/
+
+import type { Metadata } from "next";
+import { Suspense } from "react";
+import { __Resource__Detail } from "@/features/__resources-kebab__/components/__resource-kebab__-detail";
+import { ListSkeleton } from "@/features/__resources-kebab__/components/states";
+
+export const metadata: Metadata = {
+  title: "__ResourceLabel__",
+};
+
+/**
+ * A Server Component. It resolves the route param and hands it down; it does
+ * not fetch, because the row is also read by the edit sheet, the header and
+ * whatever tab is open, and React Query is what keeps those four looking at
+ * the same object.
+ *
+ * `params` is a Promise in this version of Next — await it. Destructuring it
+ * synchronously is the mistake this file exists to not make.
+ *
+ * The title is static because generating it would mean fetching the row on the
+ * server as well as in the client island: two requests, two chances to
+ * disagree. If the tab title has to carry the row's name, add
+ * `generateMetadata` and accept that cost deliberately.
+ */
+export default async function __Resource__DetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
+  return (
+    <div className="flex flex-col gap-6 p-6">
+      <Suspense fallback={<ListSkeleton rows={4} />}>
+        <__Resource__Detail id={id} />
+      </Suspense>
+    </div>
+  );
+}
+
+/* ============================================================================
+ * FILE: features/__resources-kebab__/components/__resource-kebab__-detail.tsx
+ * ==========================================================================*/
+
+"use client";
+
+import { ArrowLeft, Pencil } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ROUTES } from "@/config/routes";
+import { isApiError } from "@/lib/api/errors";
+import type { ObjectId } from "@/lib/api/types";
+import { PermissionGate } from "@/lib/auth/permission-gate";
+import { PERMISSIONS } from "@/lib/auth/permissions";
+import { useCan } from "@/features/auth/hooks/use-permission";
+import { formatDateTime } from "@/lib/format/date";
+// PICK: the hook that exposes the organization's `timezone` and main
+// `currency` from `GET /auth/me`. Confirm the path and the shape against the
+// auth slice — every date and every amount on this screen goes through it.
+import { useOrganization } from "@/features/auth/hooks/use-organization";
+import { use__Resource__, useDelete__Resource__ } from "../hooks/use-__resources-kebab__";
+import { ErrorCard, ForbiddenPanel } from "./states";
+
+export function __Resource__Detail({ id }: { id: ObjectId }) {
+  const router = useRouter();
+  const query = use__Resource__(id);
+  const delete__Resource__ = useDelete__Resource__();
+
+  /*
+   * The business's timezone and main currency, not the browser's. Both
+   * formatters take them as arguments because there is no correct default:
+   * every amount is stored in the main currency and every date is resolved in
+   * the business timezone (brief §8.1–8.2), so a bookkeeper opening the app
+   * from another country still sees the day the books say.
+   *
+   * Drop `currency` from the destructuring if this screen shows no money.
+   */
+  const { timezone, currency } = useOrganization();
+
+  /*
+   * `useCan` where the answer changes markup beyond "render or don't" —
+   * a destructive action that needs its own confirm flow, a tab that only
+   * exists for managers. `PermissionGate` where it is purely "render or
+   * don't". Both read the list from `GET /auth/me`; neither is the
+   * enforcement, which is the API's 403.
+   */
+  const canDelete = useCan(__PERM_DELETE__);
+
+  if (query.isPending) return <DetailSkeleton />;
+
+  if (query.isError) {
+    // 403 first: a whole-page state, calm, with a way out (brief §8.4).
+    if (isApiError(query.error) && query.error.status === 403) return <ForbiddenPanel />;
+
+    /*
+     * 404 covers two cases the API deliberately does not distinguish: the row
+     * is gone, or it belongs to another business (BACKEND-GUIDE §4). Rendered
+     * inline rather than through `notFound()` so the user keeps the app shell
+     * and a one-click way back to the list — a full-page 404 for a stale
+     * bookmark strands them.
+     */
+    if (isApiError(query.error) && query.error.status === 404) return <NotFoundCard />;
+
+    return <ErrorCard error={query.error} onRetry={() => void query.refetch()} />;
+  }
+
+  const __resource__ = query.data;
+
+  return (
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-2 w-fit text-muted-foreground"
+            render={<Link href={ROUTES.__resources__.list} />}
+          >
+            <ArrowLeft data-icon="inline-start" />
+            __ResourcesLabel__
+          </Button>
+          <h1 className="font-heading text-2xl">{__resource__.name}</h1>
+          <p className="font-mono text-xs text-muted-foreground">
+            Updated {formatDateTime(__resource__.updatedAt, timezone)}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <PermissionGate permission={__PERM_UPDATE__}>
+            <Button variant="outline" render={<Link href={ROUTES.__resources__.edit(id)} />}>
+              <Pencil data-icon="inline-start" />
+              Edit
+            </Button>
+          </PermissionGate>
+
+          {/*
+            PICK: the destructive action, and get its WORD right (brief §9).
+            Financial records are never deleted: a sale is voided, a debt is
+            written off, a payment is voided, a customer or product is
+            archived. Each of those goes through a ReasonDialog (§7) that
+            states the consequence in one sentence before asking for the
+            reason — the confirm below is only correct for a resource whose
+            removal is genuinely a delete and genuinely reversible by
+            re-creating it.
+          */}
+          {canDelete ? (
+            <Button
+              variant="destructive"
+              disabled={delete__Resource__.isPending}
+              onClick={() => {
+                delete__Resource__.mutate(id, {
+                  // Navigate only after the server confirms. Leaving first and
+                  // letting the request finish in the background means a 409
+                  // has nowhere to land and the row appears to have gone.
+                  onSuccess: () => router.push(ROUTES.__resources__.list),
+                });
+              }}
+            >
+              Delete
+            </Button>
+          ) : null}
+        </div>
+      </header>
+
+      {/*
+        A failed delete belongs beside the button that caused it, not in a
+        toast that has scrolled away by the time the user looks (brief §8.4).
+      */}
+      {delete__Resource__.isError ? (
+        <ErrorCard error={delete__Resource__.error} />
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Details</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2">
+          {/*
+            PICK: the fields and cards brief §6 specifies for this screen.
+            Money through `formatMoney(value, currency)`, quantities through
+            `formatQuantity(value, unit)`, dates through
+            `formatDate(value, timezone)` / `formatDateTime(value, timezone)`,
+            statuses as a StatusPill with §8.3's exact words. A raw
+            `{row.price}` renders `1250.5` and is wrong on every count.
+          */}
+          <Detail label="Name" value={__resource__.name} />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="font-mono text-xs uppercase text-muted-foreground">{label}</span>
+      <span className="text-sm">{value}</span>
+    </div>
+  );
+}
+
+function NotFoundCard() {
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle>__ResourceLabel__ not found</CardTitle>
+        <CardDescription>
+          It may have been removed, or the link may be wrong.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button variant="outline" render={<Link href={ROUTES.__resources__.list} />}>
+          Back to __resourcesLabel__
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Loading, in the shape of the content above it (brief §8.4). */
+function DetailSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-8 w-56" />
+        </div>
+        <Skeleton className="h-8 w-24" />
+      </div>
+      <Skeleton className="h-48 w-full rounded-xl" />
+    </div>
+  );
+}

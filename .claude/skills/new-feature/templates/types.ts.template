@@ -1,0 +1,81 @@
+/* ============================================================================
+ * FILE: features/__resources-kebab__/types.ts
+ * Delete this banner after substituting.
+ * ==========================================================================*/
+
+import type { ObjectId, PaginationParams } from "@/lib/api/types";
+
+/**
+ * The domain shape `GET /__resources-kebab__` returns.
+ *
+ * **The model is the field list; the shaper is the shape.** No raw Mongoose
+ * document reaches the wire: every controller maps its result through a
+ * `publicX` shaper first — `publicProduct` in
+ * `Backend/src/controller/product.controller.ts`, `publicCustomer`,
+ * `publicDebt`, `listedMember`, and for a few resources a `toXResponse` one
+ * layer down in the db action (`AnnouncementResponse`, `ProjectResponse`).
+ * Read that function, not just the model: it decides which fields exist, and
+ * some endpoints wrap the row rather than returning it flat (`GET /categories`
+ * yields `{ category, productCount }`).
+ *
+ * Three consequences that shape this type:
+ *
+ *   - **Ids are `id: string`.** The shaper reads Mongoose's `id` virtual
+ *     explicitly (`id: product.id`), which is why the backend needs no
+ *     `toJSON` transform. There is no `_id` on the wire anywhere.
+ *   - **Nested references are strings**, not populated objects and not
+ *     ObjectIds: the shapers `.toString()` them (`uploadId`, `productId`,
+ *     `saleId`, `createdBy`). A shaper that populates says so — `author: { id,
+ *     name }` on an announcement — so check rather than assume either way.
+ *   - **`organizationId` and `__v` are not on the wire at all.** The shapers
+ *     drop them. The tenant id is never sent either (BACKEND-GUIDE §4).
+ *
+ * Wire types, not runtime types: dates arrive as ISO 8601 **strings**, never
+ * `Date`. Typing a date field as `Date` compiles and then fails on
+ * `.getTime()` — JSON has no date type and nothing in this app revives one.
+ */
+export interface __Resource__ {
+  id: ObjectId;
+
+  // PICK: the fields the endpoint actually returns, in the order the model
+  // declares them. Conventions the backend keeps, which this type must reflect:
+  //   money      -> number, main-currency units, 2 dp  (BACKEND-GUIDE §4)
+  //   quantity   -> number, up to 3 dp
+  //   ids        -> ObjectId (a 24-char hex string), because the shaper
+  //                 `.toString()`s them; a populated one is an object and the
+  //                 shaper will show you which it is
+  //   optionals  -> `field?: string`, because the backend omits an unset key
+  //                 rather than sending null. `string | null` would be a lie
+  //                 that makes every render do the wrong nullish check.
+  name: string;
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Everything `GET /__resources-kebab__` accepts.
+ *
+ * Extends `PaginationParams` because every list endpoint in this API is
+ * paginated — `?page=&limit=`, limit capped at 100 server-side, and the row
+ * count comes back in `meta` (BACKEND-GUIDE §4). A list hook that ignores this
+ * silently shows page 1 forever.
+ *
+ * Every field is optional and every field is a URL-serialisable scalar, and
+ * that is not an accident: this exact type is what `nuqs` keeps in the query
+ * string and what goes into the React Query key. A nested object or a `Date`
+ * here breaks the first and makes the second unstable, so two renders with the
+ * same filters would fetch twice.
+ */
+export interface __Resource__ListParams extends PaginationParams {
+  /** Free-text search. The backend decides which fields it covers. */
+  search?: string;
+
+  // PICK: the rest of the query the backend documents for this resource, e.g.
+  //   status?: "active" | "archived" | "all";
+  //   categoryId?: ObjectId;
+  //   lowStock?: boolean;
+  // Only list parameters the endpoint really supports: bodies are strict, and
+  // an unknown *query* key is at best ignored, which reads as "the filter is
+  // broken" rather than as an error.
+}

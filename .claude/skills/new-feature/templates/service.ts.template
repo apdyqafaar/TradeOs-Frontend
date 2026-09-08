@@ -1,0 +1,78 @@
+/* ============================================================================
+ * FILE: features/__resources-kebab__/services/__resource-kebab__.service.ts
+ * Delete this banner after substituting.
+ * ==========================================================================*/
+
+import { apiDelete, apiGet, apiGetList, apiPatch, apiPost } from "@/lib/api/client";
+import type { ObjectId, Paginated } from "@/lib/api/types";
+import type {
+  Create__Resource__Input,
+  Update__Resource__Input,
+} from "../schemas/__resource-kebab__.schema";
+import type { __Resource__, __Resource__ListParams } from "../types";
+
+/**
+ * The only file in this slice that knows a URL exists.
+ *
+ * No React, no hooks, no query client, no toasts, no navigation. That is what
+ * makes these functions testable without a renderer and reusable from a place
+ * that is not a component — and it is the same reason the backend's service
+ * layer never imports Express types.
+ *
+ * It also does no envelope handling. The axios response interceptor in
+ * `lib/api/client` has already unwrapped `{ success, message, data, meta }`
+ * and turned a failure into an `ApiError`, so what these functions return is
+ * the domain object. Reaching for `response.data.data` here means you are
+ * fighting the interceptor, and the second `.data` will be `undefined`.
+ *
+ * Named after the operation, not the resource — `list`, `getById`, `create`,
+ * `update`, `remove` — and imported namespaced
+ * (`import * as __resource__Service`), which mirrors the backend's service
+ * modules and keeps the call sites readable.
+ */
+
+/**
+ * The tenant is not in this path and never will be. `requireMember` resolves
+ * the caller's organization from their own session on every request; the
+ * frontend does not send an organization id in a path, body, query or header
+ * (BACKEND-GUIDE §4).
+ */
+const BASE = "/__resources-kebab__";
+
+/** `GET /__resources-kebab__` — always paginated, so always `apiGetList`. */
+export const list = (params: __Resource__ListParams): Promise<Paginated<__Resource__>> =>
+  apiGetList<__Resource__>(BASE, params);
+
+/**
+ * `GET /__resources-kebab__/:id`
+ *
+ * A 404 here means one of two things and the UI cannot tell them apart on
+ * purpose: the row does not exist, or it belongs to another business. The
+ * backend answers 404 for a cross-tenant id rather than 403 so an id cannot be
+ * probed for existence. Treat both as "not found".
+ */
+export const getById = (id: ObjectId): Promise<__Resource__> =>
+  apiGet<__Resource__>(`${BASE}/${id}`);
+
+/** `POST /__resources-kebab__` — 201 with the created row as `data`. */
+export const create = (input: Create__Resource__Input): Promise<__Resource__> =>
+  apiPost<__Resource__>(BASE, input);
+
+/** `PATCH /__resources-kebab__/:id` — 200 with the full updated row. */
+export const update = (id: ObjectId, input: Update__Resource__Input): Promise<__Resource__> =>
+  apiPatch<__Resource__>(`${BASE}/${id}`, input);
+
+/**
+ * `DELETE /__resources-kebab__/:id`
+ *
+ * Typed `void` because nothing useful comes back and a caller that thinks
+ * otherwise will build on a shape the endpoint does not promise.
+ *
+ * PICK: check what this resource's delete actually is. In this domain most
+ * "deletes" are archives, and the financial ones are neither — a sale is
+ * voided, a debt is written off, a payment is voided (brief §9). If the
+ * backend exposes `POST /:id/void` rather than `DELETE /:id`, write that
+ * function here instead of this one and name it `voidSale`, not `remove`;
+ * the word the API uses is the word the UI must use.
+ */
+export const remove = (id: ObjectId): Promise<void> => apiDelete<void>(`${BASE}/${id}`);

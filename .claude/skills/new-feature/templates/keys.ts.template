@@ -1,0 +1,57 @@
+/* ============================================================================
+ * FILE: features/__resources-kebab__/keys.ts
+ * Delete this banner after substituting.
+ * ==========================================================================*/
+
+import { createQueryKeys } from "@/lib/query/keys";
+import type { ObjectId } from "@/lib/api/types";
+import type { __Resource__ListParams } from "./types";
+
+/**
+ * Every React Query key this slice uses, in one file.
+ *
+ * The point is not tidiness. A key spelled inline at the `useQuery` site and
+ * again at the `invalidateQueries` site is two strings that have to stay equal
+ * forever, and when they stop being equal nothing breaks loudly — the list
+ * simply keeps showing the row you just deleted until the next hard reload.
+ * Naming the key once removes that failure mode.
+ *
+ * `createQueryKeys("__resources-kebab__")` namespaces everything under the
+ * resource, so `invalidateQueries({ queryKey: __resource__Keys.all })` can
+ * never reach another feature's cache.
+ *
+ * The wrapper below exists so this file is the ONLY place that touches
+ * `createQueryKeys`'s surface. If that helper changes shape, this file changes
+ * and nothing else in the slice does.
+ */
+const keys = createQueryKeys("__resources-kebab__");
+
+export const __resource__Keys = {
+  /**
+   * Everything this slice caches. The blunt instrument — reach for one of the
+   * narrower keys first, because invalidating `all` also throws away detail
+   * entries that are still correct and refetches them on the next render.
+   */
+  all: keys.all,
+
+  /**
+   * Every list, at any page, under any filter. This is what a create or a
+   * delete invalidates: both change which rows land on which page and both
+   * change `meta.total`, so no single cached page can be patched to match.
+   */
+  lists: () => keys.lists(),
+
+  /**
+   * One list. `params` is part of the key, which is exactly why
+   * `__Resource__ListParams` is flat and scalar-only — React Query hashes the
+   * key, and an unstable object would make two identical filter sets look like
+   * two different queries.
+   */
+  list: (params: __Resource__ListParams) => keys.list(params),
+
+  /** Every detail entry — the target when a bulk action touched many rows. */
+  details: () => keys.details(),
+
+  /** One row. Seeded from a mutation response and read by the detail page. */
+  detail: (id: ObjectId) => keys.detail(id),
+} as const;

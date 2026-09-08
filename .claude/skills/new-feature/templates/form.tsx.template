@@ -1,0 +1,237 @@
+/* ============================================================================
+ * FILE: features/__resources-kebab__/components/__resource-kebab__-form.tsx
+ * Delete this banner after substituting.
+ * ==========================================================================*/
+
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
+import { type Path, type UseFormReturn, useForm } from "react-hook-form";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ROUTES } from "@/config/routes";
+import { API_ERROR_CODE, type ApiError, fieldErrorsFor, hasCode, isApiError } from "@/lib/api/errors";
+import { useCreate__Resource__ } from "../hooks/use-__resources-kebab__";
+import {
+  create__Resource__Schema,
+  type Create__Resource__Input,
+} from "../schemas/__resource-kebab__.schema";
+
+/**
+ * Which 409 belongs on which field.
+ *
+ * A conflict is a domain rule refusing the write, and brief §8.4 says it is
+ * shown "inline where the action was taken". For a form that means the control
+ * the user has to change — a `DUPLICATE_BARCODE` banner at the top of a
+ * fourteen-field form is a scavenger hunt.
+ *
+ * Keyed by `code`, never by message: codes are the contract (BACKEND-GUIDE
+ * §4), messages are prose and change without warning.
+ *
+ * PICK: the codes this endpoint can raise, from brief Appendix A. Examples:
+ *   [API_ERROR_CODE.DUPLICATE_BARCODE]: "barcode",
+ *   [API_ERROR_CODE.CATEGORY_NOT_FOUND]: "categoryId",
+ *   [API_ERROR_CODE.DUPLICATE_PHONE]: "phone",
+ * A code with no field here falls through to the banner, which is the right
+ * default — it is visible, just not ideal.
+ */
+const CONFLICT_FIELDS: Partial<Record<string, Path<Create__Resource__Input>>> = {};
+
+export function __Resource__Form({ onCancel }: { onCancel?: () => void }) {
+  const router = useRouter();
+  const create__Resource__ = useCreate__Resource__();
+
+  /*
+   * `zodResolver` runs the same schema the API mirrors, so the common mistakes
+   * never leave the browser.
+   *
+   * One generic is enough while the schema's input and output types match. Add
+   * a `.default()`, a `.transform()` or a coercion and they diverge, and the
+   * form must be declared as
+   *   useForm<z.input<typeof schema>, unknown, z.output<typeof schema>>
+   * or the values handed to `onSubmit` will be typed as the pre-transform
+   * shape and lie about what the service receives.
+   */
+  const form = useForm<Create__Resource__Input>({
+    resolver: zodResolver(create__Resource__Schema),
+    // Every controlled field needs an entry here, or React logs the
+    // controlled/uncontrolled warning the first time the user types.
+    defaultValues: {
+      name: "",
+    },
+  });
+
+  const onSubmit = form.handleSubmit(async (values) => {
+    try {
+      // `mutateAsync`, not `mutate`: `handleSubmit` needs to await the write
+      // for `formState.isSubmitting` to stay true until the server answers,
+      // and the rejection is what carries the 422 and the 409.
+      const created = await create__Resource__.mutateAsync(values);
+      router.push(ROUTES.__resources__.detail(created.id));
+    } catch (error) {
+      // A non-API failure — a bug in this component, a thrown render error —
+      // is not something a field message can explain. Let it reach the error
+      // boundary rather than dressing it up as a validation problem.
+      if (!isApiError(error)) throw error;
+      applyServerError(error, form);
+    }
+  });
+
+  const rootError = form.formState.errors.root?.serverError?.message;
+
+  return (
+    <form onSubmit={onSubmit} noValidate className="flex max-w-xl flex-col gap-4">
+      {/*
+        The banner is the last resort, not the first: it appears only when no
+        field claimed the error (see `applyServerError`). A form that shows
+        both a banner and field messages for the same failure reads as two
+        problems.
+      */}
+      {rootError ? (
+        <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {rootError}
+        </p>
+      ) : null}
+
+      <Field label="Name" htmlFor="__resource__-name" error={form.formState.errors.name?.message}>
+        <Input
+          id="__resource__-name"
+          // base-nova's Input already styles `aria-invalid` — setting it is
+          // what makes the field look wrong and what a screen reader announces.
+          aria-invalid={Boolean(form.formState.errors.name)}
+          {...form.register("name")}
+        />
+      </Field>
+
+      {/*
+        PICK: the rest of the fields, in the section order brief §6 gives for
+        this screen. Two things that bite:
+
+        - Number inputs must register with `{ valueAsNumber: true }`:
+            {...form.register("costPrice", { valueAsNumber: true })}
+          Without it the value is a string, zod refuses it, and the message
+          ("expected number") points at the schema rather than at the real
+          cause, which is this line.
+
+        - A control that is not a native input (a Select, a Switch, the
+          ImagePicker) needs `<Controller>` or `form.setValue(..., { shouldDirty:
+          true, shouldValidate: true })`; `register` alone will not see it.
+      */}
+
+      <div className="flex items-center gap-2">
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting ? "Saving…" : "Create __resourceLabel__"}
+        </Button>
+        {onCancel ? (
+          <Button type="button" variant="ghost" onClick={onCancel}>
+            Cancel
+          </Button>
+        ) : null}
+      </div>
+    </form>
+  );
+}
+
+/**
+ * Turn an `ApiError` into something the user can act on, in priority order:
+ * the field that is wrong, then the field the conflict is about, then one
+ * banner. Every branch is on `code` or on the structured `errors` map — never
+ * on `message`.
+ */
+function applyServerError(
+  error: ApiError,
+  form: UseFormReturn<Create__Resource__Input>,
+): void {
+  // 422 — `errors: { field: message }` straight from the backend's validate
+  // middleware. This is the common case and the only one that can be fully
+  // automatic.
+  const fieldErrors = fieldErrorsFor(error);
+  if (fieldErrors) {
+    const controls = new Set(Object.keys(form.getValues()));
+    let placed = false;
+
+    for (const [field, message] of Object.entries(fieldErrors)) {
+      // Backend paths are dotted for nested bodies ("items.0.quantity"). The
+      // first segment is what this form owns a control for; RHF resolves the
+      // rest of the path itself.
+      const root = field.split(".")[0];
+      if (root && controls.has(root)) {
+        form.setError(field as Path<Create__Resource__Input>, { type: "server", message });
+        placed = true;
+      }
+    }
+
+    // If nothing matched, the form and the endpoint disagree about the body —
+    // usually a field renamed on one side only. Fall through to the banner
+    // rather than swallowing it, which would leave a form that refuses to
+    // submit and says nothing.
+    if (placed) return;
+  }
+
+  // 409 — a domain rule refused the write. Inline, on the field that has to
+  // change.
+  const conflictField = error.code ? CONFLICT_FIELDS[error.code] : undefined;
+  if (conflictField) {
+    form.setError(conflictField, { type: "server", message: error.message });
+    return;
+  }
+
+  // 403 — the submit button should not have been reachable. Say so plainly
+  // instead of showing the API's phrasing, which is written for a developer.
+  if (hasCode(error, API_ERROR_CODE.FORBIDDEN)) {
+    form.setError("root.serverError", {
+      type: "server",
+      message: "You don't have permission to do this.",
+    });
+    return;
+  }
+
+  form.setError("root.serverError", { type: "server", message: error.message });
+}
+
+/** Label, control, message — so no field can ship without its error slot. */
+function Field({
+  label,
+  htmlFor,
+  error,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  error?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={htmlFor}>{label}</Label>
+      {children}
+      {error ? (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------------------------
+ * EDITING
+ *
+ * The same component serves an edit sheet with three changes and no new file:
+ *
+ *   1. Take the row: `{ __resource__ }: { __resource__?: __Resource__ }`.
+ *   2. Swap the schema and the hook when it is present —
+ *      `update__Resource__Schema` and `useUpdate__Resource__(__resource__.id)`
+ *      — and seed `defaultValues` from the row.
+ *   3. On success, close the sheet instead of navigating; the hook has already
+ *      written the response into the detail cache, so the screen behind it is
+ *      correct before the sheet finishes animating.
+ *
+ * Send only what changed: `form.formState.dirtyFields` tells you which keys to
+ * pick. PATCH means "change what I sent", and a full body re-sends fields the
+ * user never touched — which is how one tab's stale value overwrites another's
+ * edit.
+ * ------------------------------------------------------------------------- */

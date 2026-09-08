@@ -1,0 +1,385 @@
+/* ============================================================================
+ * FILE: app/(app)/__resources-kebab__/page.tsx
+ * Delete this banner after substituting.
+ * ==========================================================================*/
+
+import type { Metadata } from "next";
+import { Suspense } from "react";
+import { __Resource__List } from "@/features/__resources-kebab__/components/__resource-kebab__-list";
+import { ListSkeleton } from "@/features/__resources-kebab__/components/states";
+
+export const metadata: Metadata = {
+  title: "__ResourcesLabel__",
+};
+
+/**
+ * A Server Component, and it stays one.
+ *
+ * Everything here is layout, metadata and a Suspense boundary. There is no
+ * `"use client"`, no hook, and no data fetch — the interactive part is one
+ * child component that opts into the client, which is the split this whole
+ * app uses: the page is a frame, the frame's contents are a client island.
+ *
+ * The Suspense boundary is load-bearing, not decoration. `__Resource__List`
+ * reads the query string through `nuqs`, which uses `useSearchParams` under
+ * the App Router adapter; a client component that does that without a Suspense
+ * boundary above it opts the entire route out of static rendering at build
+ * time. The fallback is also the honest loading state for the first paint, so
+ * it is the same skeleton the list itself shows while refetching.
+ */
+export default function __Resource__ListPage() {
+  return (
+    <div className="flex flex-col gap-6 p-6">
+      <Suspense fallback={<ListSkeleton />}>
+        <__Resource__List />
+      </Suspense>
+    </div>
+  );
+}
+
+/* ============================================================================
+ * FILE: features/__resources-kebab__/components/states.tsx
+ *
+ * The four states brief §8.4 makes mandatory that are NOT in the shared
+ * component list (§7). `EmptyState` and `DataTable` are §7's and live in
+ * `components/shared/`; these are the slice's own until a second feature needs
+ * them, at which point move the file to `components/shared/` and import it
+ * from there. Copying it is how the Request ID line goes missing from one
+ * screen.
+ * ==========================================================================*/
+
+"use client";
+
+import Link from "next/link";
+import { ROUTES } from "@/config/routes";
+import type { ApiError } from "@/lib/api/errors";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+
+/**
+ * The error state (brief §8.4): the human message, and the request id support
+ * will ask for.
+ *
+ * `error.message` is the backend's human sentence and is safe to render. It is
+ * *not* what code branches on — that is `error.code` — and the difference
+ * matters because messages change freely while codes do not.
+ */
+export function ErrorCard({ error, onRetry }: { error: ApiError; onRetry?: () => void }) {
+  return (
+    <Card role="alert" size="sm">
+      <CardHeader>
+        <CardTitle>Something went wrong</CardTitle>
+        <CardDescription>{error.message}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-wrap items-center justify-between gap-3">
+        {/*
+          The `X-Request-Id` the API sets on every response. It is the only
+          thing that ties what the user saw to a line in the server log, so it
+          is shown, always, in mono, quietly.
+        */}
+        {error.requestId ? (
+          <p className="font-mono text-xs text-muted-foreground">
+            Request ID: {error.requestId}
+          </p>
+        ) : (
+          <span />
+        )}
+        {onRetry ? (
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            Try again
+          </Button>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * The 403 state (brief §8.4). Navigation should make this unreachable — nav
+ * items and buttons are absent, not disabled, when the permission is missing —
+ * so reaching it means someone followed a link or typed a URL. Calm, one line,
+ * a way back. No "contact your administrator" scolding.
+ */
+export function ForbiddenPanel() {
+  return (
+    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center">
+      <h1 className="font-heading text-xl">You don&rsquo;t have access to this</h1>
+      <p className="max-w-sm text-sm text-muted-foreground">
+        Ask an owner or manager to add it to your role.
+      </p>
+      {/*
+        base-nova's Button is a Base UI button: it takes `render`, not
+        `asChild`. `render={<Link/>}` keeps the button's styling and gives the
+        anchor its href.
+      */}
+      <Button variant="outline" render={<Link href={ROUTES.overview} />}>
+        Back to overview
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * The loading state (brief §8.4): a skeleton in the shape of the content,
+ * never a spinner in the page body. Keep the row count near a real first page
+ * so the layout does not jump when the data lands.
+ */
+export function ListSkeleton({ rows = 8 }: { rows?: number }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-7 w-40" />
+        <Skeleton className="h-8 w-32" />
+      </div>
+      <Skeleton className="h-8 w-64" />
+      <div className="flex flex-col gap-2">
+        {Array.from({ length: rows }, (_, index) => (
+          // A skeleton row has no identity of its own; the index is the only
+          // honest key here and the list is never reordered.
+          <Skeleton key={index} className="h-11 w-full" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================================
+ * FILE: features/__resources-kebab__/components/__resource-kebab__-list.tsx
+ * ==========================================================================*/
+
+"use client";
+
+import { Plus } from "lucide-react";
+import Link from "next/link";
+import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
+import { type ReactNode, useEffect, useState } from "react";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { EmptyState } from "@/components/shared/empty-state";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ROUTES } from "@/config/routes";
+import { isApiError } from "@/lib/api/errors";
+import { PermissionGate } from "@/lib/auth/permission-gate";
+import { PERMISSIONS } from "@/lib/auth/permissions";
+import { formatDate } from "@/lib/format/date";
+// PICK: the hook that exposes the organization's `timezone` and main
+// `currency` from `GET /auth/me`. Confirm the path and the shape against the
+// auth slice — every date and every amount on this screen goes through it.
+import { useOrganization } from "@/features/auth/hooks/use-organization";
+import { use__Resource__List } from "../hooks/use-__resources-kebab__";
+import type { __Resource__ } from "../types";
+import { ErrorCard, ForbiddenPanel, ListSkeleton } from "./states";
+
+/**
+ * Filters live in the URL, not in a store.
+ *
+ * A filtered list is a place, and a place has an address: the user can reload
+ * it, bookmark it, send it to a colleague, and use the back button on it. A
+ * zustand store gives up all four and, worse, survives navigation — so
+ * returning to this screen later shows someone else's search. `nuqs` keeps the
+ * query string as the single source of truth.
+ *
+ * `history` defaults to `replace`, which is what we want: typing a filter
+ * should not put twenty entries in the back stack.
+ *
+ * The parser map is module-level so its identity is stable across renders.
+ */
+const FILTER_PARSERS = {
+  page: parseAsInteger.withDefault(1),
+  // The API caps `limit` at 100; the footer offers 25/50/100 (brief §7).
+  limit: parseAsInteger.withDefault(25),
+  search: parseAsString.withDefault(""),
+};
+
+export function __Resource__List() {
+  const [filters, setFilters] = useQueryStates(FILTER_PARSERS);
+
+  /*
+   * The business's timezone and main currency, not the browser's.
+   *
+   * Every amount is stored in the main currency and every date is resolved in
+   * the business timezone (brief §8.1–8.2), so both formatters take them as
+   * arguments — there is no correct default. A shop in Mogadishu whose
+   * bookkeeper opens the app from Nairobi must see the same day on the same
+   * row, and `toLocaleString()` would quietly show them a different one.
+   *
+   * Drop `currency` from the destructuring if this screen shows no money.
+   */
+  const { timezone, currency } = useOrganization();
+
+  /*
+   * Columns live inside the component because the cells need `timezone` and
+   * `currency`. That is not a compromise: hoisting them to module scope would
+   * mean a formatter with no access to the business's settings, which is how a
+   * date ends up rendered in the browser's zone. The React Compiler memoises
+   * this array, so re-creating it per render costs nothing.
+   */
+  const columns: DataTableColumn<__Resource__>[] = [
+    {
+      key: "name",
+      header: "Name",
+      sortable: true,
+      cell: (row) => <span className="font-medium">{row.name}</span>,
+    },
+    {
+      key: "createdAt",
+      header: "Created",
+      cell: (row) => (
+        <span className="font-mono text-xs">{formatDate(row.createdAt, timezone)}</span>
+      ),
+    },
+    // PICK: the columns brief §6 specifies for this screen. The rules that bind:
+    //   money      -> formatMoney(row.price, currency): mono, 2 dp, currency
+    //                 CODE not symbol — `USD 1,250.00`, because the market
+    //                 uses several currencies whose symbols collide (§8.1).
+    //                 The currency argument is required; never `toFixed` at
+    //                 the call site and never hardcode "USD".
+    //   quantity   -> formatQuantity(row.quantity, row.unit): up to 3 dp,
+    //                 trailing zeros trimmed, unit after the number.
+    //   date/time  -> formatDate(value, timezone) / formatDateTime(value,
+    //                 timezone). The timezone argument is required for the
+    //                 reason above; `new Date(x).toLocaleString()` is never
+    //                 the answer.
+    //   status     -> a StatusPill with the exact words and colours from §8.3.
+    //                 Those strings are a vocabulary, not copy to improve.
+  ];
+
+  /*
+   * The search box keeps its own state so typing never waits on a router
+   * update, and the URL — and therefore the query key — catches up 300 ms
+   * later. nuqs's `limitUrlUpdates: debounce()` is not a substitute: it
+   * rate-limits the URL *write* while still returning the new value
+   * immediately, so the query key would still change on every keystroke and
+   * fire a request per character.
+   *
+   * The draft does not re-seed on back-navigation; that is the accepted trade
+   * for an input that never stutters.
+   */
+  const [searchDraft, setSearchDraft] = useState(filters.search);
+
+  useEffect(() => {
+    if (searchDraft === filters.search) return;
+    const timer = setTimeout(() => {
+      // Back to page 1: page 4 of the old result set is meaningless under a new
+      // filter, and the API would answer with an empty page — which reads as
+      // "no matches" when there are plenty.
+      void setFilters({ search: searchDraft, page: 1 });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchDraft, filters.search, setFilters]);
+
+  const query = use__Resource__List(filters);
+  const hasActiveFilters = filters.search !== "";
+
+  let body: ReactNode;
+
+  if (query.isPending) {
+    body = <ListSkeleton />;
+  } else if (query.isError) {
+    // 403 is a whole-page state, not a card in a table (brief §8.4).
+    body =
+      isApiError(query.error) && query.error.status === 403 ? (
+        <ForbiddenPanel />
+      ) : (
+        <ErrorCard error={query.error} onRetry={() => void query.refetch()} />
+      );
+  } else if (query.data.items.length === 0) {
+    // Empty because of a filter is a different state from empty because there
+    // is nothing yet — and offering "New __resourceLabel__" to someone whose
+    // search simply missed is how a duplicate gets created.
+    body = hasActiveFilters ? (
+      <EmptyState
+        title="No __resourcesLabel__ match these filters"
+        description="Try a different search, or clear the filters to see everything."
+        action={
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSearchDraft("");
+              void setFilters({ search: null, page: null });
+            }}
+          >
+            Clear filters
+          </Button>
+        }
+      />
+    ) : (
+      <EmptyState
+        title="No __resourcesLabel__ yet"
+        description="__ResourcesLabel__ you add will show up here."
+        action={
+          <PermissionGate permission={__PERM_CREATE__}>
+            <Button render={<Link href={ROUTES.__resources__.new} />}>
+              New __resourceLabel__
+            </Button>
+          </PermissionGate>
+        }
+      />
+    );
+  } else {
+    body = (
+      <DataTable
+        columns={columns}
+        rows={query.data.items}
+        getRowId={(row) => row.id}
+        // While `keepPreviousData` is holding the last page on screen, dim it
+        // rather than replacing it with a skeleton — the rows are real, just
+        // one page stale, and blanking them makes paging feel broken.
+        isStale={query.isPlaceholderData}
+        pagination={{
+          page: query.data.meta.page,
+          limit: query.data.meta.limit,
+          total: query.data.meta.total,
+          totalPages: query.data.meta.totalPages,
+          onPageChange: (page) => void setFilters({ page }),
+          // Changing the page size changes which rows page 1 holds, so the
+          // current page number no longer means anything.
+          onLimitChange: (limit) => void setFilters({ limit, page: 1 }),
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-heading text-2xl">__ResourcesLabel__</h1>
+        {/*
+          Gated, not disabled. A button the user can see but not use is a
+          promise the API will refuse; §5 of the brief makes absence the rule
+          for navigation and the same reasoning applies to the CTA.
+
+          Never build the permission string here — `PERMISSIONS.X` is a
+          compile-time value precisely so a typo is a type error instead of a
+          check that is silently false forever.
+        */}
+        <PermissionGate permission={__PERM_CREATE__}>
+          <Button render={<Link href={ROUTES.__resources__.new} />}>
+            <Plus data-icon="inline-start" />
+            New __resourceLabel__
+          </Button>
+        </PermissionGate>
+      </header>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          type="search"
+          value={searchDraft}
+          onChange={(event) => setSearchDraft(event.target.value)}
+          placeholder="Search __resourcesLabel__"
+          aria-label="Search __resourcesLabel__"
+          className="max-w-xs"
+        />
+        {/*
+          PICK: the rest of the filters brief §6 specifies for this screen —
+          a status segmented control, a category select, a period bar. Each one
+          is another entry in FILTER_PARSERS and another `page: 1` reset; none
+          of them belongs in a store.
+        */}
+      </div>
+
+      {body}
+    </div>
+  );
+}

@@ -1,0 +1,198 @@
+/* ============================================================================
+ * FILE: features/__resources-kebab__/hooks/use-__resources-kebab__.ts
+ * Delete this banner after substituting.
+ * ==========================================================================*/
+
+"use client";
+
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { isApiError, type ApiError } from "@/lib/api/errors";
+import type { ObjectId, Paginated } from "@/lib/api/types";
+import { __resource__Keys } from "../keys";
+import type {
+  Create__Resource__Input,
+  Update__Resource__Input,
+} from "../schemas/__resource-kebab__.schema";
+import * as __resource__Service from "../services/__resource-kebab__.service";
+import type { __Resource__, __Resource__ListParams } from "../types";
+
+/**
+ * The ONLY file in this slice where `useQuery` and `useMutation` appear.
+ *
+ * A component that calls `useQuery` inline owns a cache key, a stale time and
+ * an invalidation contract that nothing else can see — so the next component
+ * that needs the same data invents a second key for it, and now a mutation
+ * refreshes one of them. Every read of this resource goes through a hook in
+ * this file, and every write invalidates from this file.
+ *
+ * `"use client"` is here even though this is not a component: it makes an
+ * accidental import from a Server Component fail with "you're importing a
+ * component that needs useQuery" instead of a stack trace inside React Query.
+ *
+ * Nothing here shows an error. A failure belongs to the component that caused
+ * it — next to the field for a 422, next to the button for a 409 (brief §8.4)
+ * — and a toast fired from `onError` here would swallow it before the form
+ * ever hears about it.
+ */
+
+/**
+ * `TError` is `ApiError` because the response interceptor turns every failure,
+ * including a network failure, into one. Call sites still narrow with
+ * `isApiError` where they read `status` off an error that might have come from
+ * somewhere else.
+ */
+
+// ---------------------------------------------------------------- reads
+
+export function use__Resource__List(params: __Resource__ListParams) {
+  return useQuery<Paginated<__Resource__>, ApiError>({
+    queryKey: __resource__Keys.list(params),
+    queryFn: () => __resource__Service.list(params),
+    // Page and filters are part of the key, so every page turn is a different
+    // query — and without this the table would unmount its rows and flash a
+    // skeleton on each one. `keepPreviousData` holds the previous page on
+    // screen while the next loads and reports the gap through
+    // `isPlaceholderData`, which the list dims on rather than blanking.
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * One row. `id` is optional so the hook can be called before a route param has
+ * resolved — `enabled` keeps it from firing with an empty id, which would
+ * cache a 404 under a key nothing will ever invalidate.
+ */
+export function use__Resource__(id: ObjectId | undefined) {
+  return useQuery<__Resource__, ApiError>({
+    // The key is only reached when `enabled` is true, so the empty-string
+    // fallback is never fetched under.
+    queryKey: __resource__Keys.detail(id ?? ""),
+    queryFn: () => {
+      // Narrowed, not cast. `id as ObjectId` compiles and lies; with `enabled`
+      // above, reaching this line at all means a wiring mistake, which is a
+      // bug rather than something to paper over.
+      if (!id) throw new Error("__Resource__ id is missing");
+      return __resource__Service.getById(id);
+    },
+    enabled: Boolean(id),
+    // A 404 and a 403 are answers, not faults. Another business's id returns
+    // 404 (BACKEND-GUIDE §4), and retrying either one three times only delays
+    // the screen that tells the user what happened.
+    //
+    // If `lib/query/client.ts` already refuses to retry 4xx globally, DELETE
+    // this block rather than restating it — two retry policies for the same
+    // query is how one of them silently stops being true.
+    retry: (failureCount, error) => {
+      if (isApiError(error) && error.status >= 400 && error.status < 500) return false;
+      return failureCount < 2;
+    },
+  });
+}
+
+// ---------------------------------------------------------------- writes
+
+export function useCreate__Resource__() {
+  const queryClient = useQueryClient();
+
+  return useMutation<__Resource__, ApiError, Create__Resource__Input>({
+    mutationFn: (input) => __resource__Service.create(input),
+    onSuccess: (created) => {
+      // Not an optimistic update — the server has already answered. Seeding the
+      // detail cache means "create, then open the new row" renders immediately
+      // instead of showing a skeleton for data we are holding.
+      queryClient.setQueryData(__resource__Keys.detail(created.id), created);
+
+      // `lists()`, not `all`: the detail entry above is correct, and
+      // invalidating it would immediately refetch what we just stored.
+      void queryClient.invalidateQueries({ queryKey: __resource__Keys.lists() });
+    },
+  });
+}
+
+export function useUpdate__Resource__(id: ObjectId) {
+  const queryClient = useQueryClient();
+
+  return useMutation<__Resource__, ApiError, Update__Resource__Input>({
+    mutationFn: (input) => __resource__Service.update(id, input),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(__resource__Keys.detail(id), updated);
+      // A PATCH can change a sort key or a filter match, so the row may belong
+      // on a different page now. Only the server knows; invalidate and ask.
+      void queryClient.invalidateQueries({ queryKey: __resource__Keys.lists() });
+    },
+  });
+}
+
+export function useDelete__Resource__() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, ApiError, ObjectId>({
+    mutationFn: (id) => __resource__Service.remove(id),
+    onSuccess: (_result, id) => {
+      // `removeQueries`, not `invalidateQueries`: invalidating a deleted row
+      // refetches it, gets a 404, and parks an error in the cache that the
+      // detail page will render if the user navigates back to it.
+      queryClient.removeQueries({ queryKey: __resource__Keys.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: __resource__Keys.lists() });
+    },
+  });
+}
+
+/* ----------------------------------------------------------------------------
+ * OPTIMISTIC UPDATES — read this before adding one.
+ *
+ * None of the mutations above are optimistic, and that is a decision, not an
+ * omission. A mutation may be applied optimistically only when all three hold:
+ *
+ *   1. The server's answer is fully determined by the input. Anything the
+ *      server computes — a total, a receipt number, `remaining`, `overdue`, a
+ *      stock quantity, `meta.total` — is a value we would be inventing.
+ *   2. The API cannot refuse it with a domain 409. `INSUFFICIENT_STOCK`,
+ *      `CATEGORY_IN_USE`, `DEBT_HAS_PAYMENTS`, `DUPLICATE_BARCODE` and the
+ *      rest of Appendix A all produce a rollback, and a rollback of money on
+ *      screen is worse than a spinner: the user saw a number that was never
+ *      true.
+ *   3. It touches ONE cached entry. Create and delete fail this outright on a
+ *      paginated list — which page a row lands on and what `meta.total` says
+ *      are server facts, so an optimistic insert makes the pagination footer
+ *      lie until the refetch corrects it.
+ *
+ * In practice that rules out every money, stock, sale, debt and payment
+ * operation in TradeOs. What passes is a scalar field on a single already-
+ * cached row that the API always accepts — a note, a description, a display
+ * flag. The full shape for that case:
+ *
+ *   onMutate: async (input) => {
+ *     await queryClient.cancelQueries({ queryKey: __resource__Keys.detail(id) });
+ *     const previous = queryClient.getQueryData<__Resource__>(
+ *       __resource__Keys.detail(id),
+ *     );
+ *     if (previous) {
+ *       queryClient.setQueryData<__Resource__>(__resource__Keys.detail(id), {
+ *         ...previous,
+ *         ...input,
+ *       });
+ *     }
+ *     return { previous };
+ *   },
+ *   onError: (_error, _input, context) => {
+ *     // Restore exactly what was there; do not reconstruct it from the form.
+ *     if (context?.previous) {
+ *       queryClient.setQueryData(__resource__Keys.detail(id), context.previous);
+ *     }
+ *   },
+ *   onSettled: () => {
+ *     // Runs on both paths, so the cache ends up matching the server whether
+ *     // the write landed or not.
+ *     void queryClient.invalidateQueries({ queryKey: __resource__Keys.detail(id) });
+ *   },
+ *
+ * `cancelQueries` first is not optional: an in-flight refetch that resolves
+ * after `setQueryData` overwrites the optimistic value, and the field appears
+ * to revert for no reason.
+ * ------------------------------------------------------------------------- */

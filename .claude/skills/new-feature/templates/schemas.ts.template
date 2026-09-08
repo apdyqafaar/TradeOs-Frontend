@@ -1,0 +1,99 @@
+/* ============================================================================
+ * FILE: features/__resources-kebab__/schemas/__resource-kebab__.schema.ts
+ * Delete this banner after substituting.
+ * ==========================================================================*/
+
+import { z } from "zod";
+
+/**
+ * MIRROR OF `Backend/src/validators/__resource-kebab__.validation.ts`.
+ *
+ * Open that file and copy its rules — every `min`, `max`, `trim`, enum member
+ * and optionality. This schema is not the authority; the API is. Its job is to
+ * catch the mistake in the browser, where the user can see which field is
+ * wrong, instead of a round trip that comes back as a 422 the form then has to
+ * unpack.
+ *
+ * When the two drift, the API wins and the user gets a 422 for a field the
+ * form said was fine — so when the backend validator changes, change this file
+ * in the same commit.
+ *
+ * `strictObject`, not `object`: the backend's bodies are `.strict()`, so an
+ * unknown key is a 422 rather than a quietly ignored field (BACKEND-GUIDE §4).
+ * Matching that here turns "I left a stale field in the form" into a type
+ * error at the call site instead of a failed submit.
+ *
+ * Zod v4 (see `config/env.ts`, which already uses `z.flattenError`): top-level
+ * `z.email()`, `z.iso.datetime()`, `z.strictObject()`.
+ */
+
+/** Every id in this API is a MongoDB ObjectId (BACKEND-GUIDE §4). */
+const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, "Not a valid id");
+
+/**
+ * Money is a number in main-currency units with at most two decimals.
+ *
+ * Checked with `toFixed` rather than `multipleOf(0.01)` because binary floats
+ * make the modulo test reject honest values: `8.29 % 0.01` is not 0. The
+ * comparison below is exact for every value the user can actually type, and
+ * rejects the `0.1 + 0.2` case the API would reject too.
+ *
+ * Refuse rather than round: rounding here hides the bug that produced the
+ * extra digits, and the server refuses it anyway.
+ */
+const money = z
+  .number()
+  .nonnegative()
+  .refine((value) => Number(value.toFixed(2)) === value, "Use at most 2 decimal places");
+
+/** Quantities allow three decimals (`0.250` kg). Same reasoning as `money`. */
+const quantity = z
+  .number()
+  .nonnegative()
+  .refine((value) => Number(value.toFixed(3)) === value, "Use at most 3 decimal places");
+
+/**
+ * POST /__resources-kebab__
+ *
+ * Fields the *server* fills in — `id`, `organizationId`, `createdBy`,
+ * `createdAt`, computed totals, receipt numbers — must not appear here. Sending
+ * one is a 422 against a strict body, and accepting one from the client would
+ * be a bug even if the server allowed it.
+ */
+export const create__Resource__Schema = z.strictObject({
+  // PICK: the real contract. Some shapes that recur in this API:
+  //   name:        z.string().trim().min(1, "Required").max(120),
+  //   description: z.string().trim().max(200).optional(),
+  //   categoryId:  objectId.optional(),
+  //   costPrice:   money,
+  //   quantity:    quantity,
+  //   dueDate:     z.iso.datetime(),   // ISO 8601 with a zone; not in the past
+  //
+  // Then use `objectId`, `money` and `quantity` or delete them. An unused
+  // `money` helper sitting above a `price` field means the price is being
+  // validated as a bare number, which is the exact mistake the helper exists
+  // to prevent — and the file still compiles, so nothing will tell you.
+  name: z.string().trim().min(1, "Required").max(120),
+});
+
+/**
+ * PATCH /__resources-kebab__/:id
+ *
+ * `.partial()` on the create schema, because PATCH semantics are "change what
+ * I sent". Derive it rather than hand-writing a second object, so a field
+ * added to create cannot be forgotten here.
+ *
+ * If the backend's update validator is genuinely different — a field that is
+ * create-only (an initial stock quantity), or one that is update-only — do not
+ * paper over it with `.omit()` on a lie. Write the difference out and say why:
+ *
+ *   // `quantity` is create-only; stock moves through POST /:id/stock so that
+ *   // every change leaves a StockMovement behind.
+ *   export const update__Resource__Schema = create__Resource__Schema
+ *     .omit({ quantity: true })
+ *     .partial();
+ */
+export const update__Resource__Schema = create__Resource__Schema.partial();
+
+export type Create__Resource__Input = z.infer<typeof create__Resource__Schema>;
+export type Update__Resource__Input = z.infer<typeof update__Resource__Schema>;
