@@ -151,8 +151,8 @@ export function DebtsPage() {
           and `useCreateDebt` is already written — but there is no create screen
           to send anyone to. `config/routes.ts` has no `/debts/new` row and
           `app/(app)/debts/new/page.tsx` does not exist, so the button would be
-          a 404 dressed as an affordance: the call `debt-detail.tsx` already
-          made about its own back-link and sale link.
+          a 404 dressed as an affordance — the call `debt-detail.tsx` already
+          makes about the sale link it cannot follow.
 
           TODO(slice: 3): add the action — gated on `debts:create` and *hidden*
           rather than disabled, per brief §1.1 — once a create screen lands.

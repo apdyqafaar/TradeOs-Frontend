@@ -445,3 +445,153 @@ also what exercises the `canViewCustomers && customer.isPending` guard on the he
 - `bunx biome check .` — 3 errors, **none in `features/debts` or `app/(app)/debts`**: two formatter
   diffs and one `useSemanticElements` in `features/sales/components/counter/*`, which was in flight
   from another agent while this ran. The tree was clean when this task started. Left untouched.
+
+---
+
+# Building the debts list (`/debts`, artboard `2f`) — 2026-09-09
+
+Appended by the task that built `features/debts/components/{debts-page,debt-table,debt-status-tabs}.tsx`
+and `app/(app)/debts/page.tsx`. Everything above still holds. One section above is now **out of
+date by design** and is corrected here rather than rewritten in place: the "`GET /debts` cannot
+render the debts screen the Overview shows" entry was written before `Backend` `a117e5e`, and its
+first bullet — "nothing is populated" — no longer applies to the list. Its other two bullets (no
+search, no sort) are still exactly true.
+
+## The customer column, re-verified against the backend rather than the changelog
+
+`docs/FINDINGS.md` §1 and `features/debts/types.ts` both describe the shape; both were checked
+against `../Backend/src` before the column was written, because a confidently-worded doc is not a
+wire format.
+
+- `publicDebt` takes an optional second argument and spreads it:
+  `...(customer ? { customer } : {})` (`controller/debt.controller.ts:37-40`). So an unresolved
+  customer leaves the key **absent**, not present-and-`undefined` — a client can tell "this
+  endpoint does not send names" from "this customer could not be found".
+- Only `listDebts` passes it (`debt.controller.ts:85-89`, from `result.customerById`).
+  `getDebt`, `createDebt` and `writeOffDebt` all call `publicDebt(debt)` with one argument, so
+  `GET /debts/:id` still answers a bare `customerId`. The asymmetry in the type is real.
+- The lookup is `findCustomerNamesByIds` (`db/actions/customer.actions.ts:90-98`):
+  `Customer.find({ organizationId, _id: { $in: ids } }).select("name phone").lean()` — one `$in`
+  over the distinct ids in the page, tenant-filtered, no `$lookup` and no per-row query.
+
+`<CustomerCell>` therefore branches on the key's presence. The unresolved row renders
+**"Unknown customer" over a shortened id**, with the full id in the cell's `title` and an sr-only
+sentence for a screen reader. `customer?.name ?? ""` would have been an empty cell that reads as a
+nameless customer, which is the exact failure the absent key was designed to prevent.
+
+## The outstanding total: what `GET /debts` can and cannot say
+
+Artboard `2f` draws `USD 4,120.25 outstanding` beside the title. **It is not rendered.**
+
+The figure is a sum of `remaining` over every open debt in the business. `GET /debts` answers a
+page of rows plus `{ page, limit, total, totalPages }`, where `total` is a **row count** from
+`countDebtsByOrganization` — there is no aggregate anywhere in the list path. Summing the 25 rows
+on screen and labelling the result "outstanding" would print a number that changes as you page
+through the list, on the one screen whose entire subject is money owed. A page-limited sum is not
+a smaller version of the right answer; it is a different number wearing its label.
+
+**The real figure exists, twice, and both are one aggregate.** `getDebtsSummary`
+(`../Backend/src/services/reports/debts.report.ts:40-63`) computes
+`outstanding: { $sum: "$remaining" }` over `{ organizationId, status: "open" }`, point-in-time and
+period-independent. It surfaces as:
+
+| endpoint | key | permission |
+|---|---|---|
+| `GET /dashboard` | `sections.debts.outstanding` | `debts:view` — the same gate as this page |
+| `GET /reports/debts/summary` | `outstanding` | `reports:view` — stricter; a collections clerk may not hold it |
+
+So the design **is** deliverable, through `useDashboardSection("debts")`, which needs no new
+service and no new permission. It was not taken here for one reason worth writing down rather than
+re-deriving: `GET /dashboard` rebuilds the whole Overview — ten aggregate pipelines for an Owner,
+including a 7-day sales trend and the stock, staff and projects sections — and firing that on every
+`/debts` navigation to render one number is a large request for a small figure. It is cheap only
+when the reader has just come from the Overview, where React Query's 60 s `staleTime` still covers
+it, and a figure that appears or not depending on where you navigated from is worse than one that
+never appears.
+
+**What is rendered instead** is `meta.total`, said in words that name the filter it counts —
+`12 open`, `4 overdue`, `25 debts` — in the slot the money figure occupies. It cannot be misread as
+an amount, and it is the number the page actually has. `debts-page.test.tsx` asserts the word
+"outstanding" appears nowhere on the screen.
+
+**If someone decides the trade is worth it:** read it from `useDashboardSection("debts")`, render
+it only when the section is present (it is omitted, not zeroed, for a caller without `debts:view`),
+and label it as a business-wide open balance — it is *not* filtered by the active tab, and putting
+it beside a "Paid" tab without saying so would be a third way to be wrong.
+
+## Tab counts: one of the six is knowable, so none is shown
+
+The canvas puts a count beside every tab label. `GET /debts` answers `meta.total` for the filter it
+was asked for, so the selected tab's count is free and the other five cost a request each on every
+page load. Six numbers of which five are guesses is worse than none — the same call
+`customer-detail.tsx` made about its own tab counts — so the one real count moved to the header
+where it can name its filter. `debt-status-tabs.test.tsx` asserts no tab label contains a digit.
+
+## The status cell composes `isOverdue` over `status`, and this differs from the detail screen
+
+`debt-detail.tsx` draws the stored status pill and a separate overdue badge side by side, because
+its header has room for both. A table cell has one slot, and a Status column that printed
+`STATUS_LABELS[debt.status]` alone would show a column of identical "Open" pills on the screen whose
+job is picking who to chase.
+
+So `<StatusCell>` reads `debt.isOverdue ? "Overdue" : STATUS_LABELS[debt.status]`. That is a
+boolean the server computed composed over the stored enum — **not** a fifth status: `STATUS_STYLES`
+and `STATUS_LABELS` stay `Record<DebtStatus, string>`, so adding an `overdue` key is still a compile
+error, and `debt.status === "overdue"` still does not typecheck. The magnitude stays in the Due
+column's `12 d` pill, gated on `isOverdue` and never on `daysOverdue > 0` — the API sends exactly
+`0` when not overdue, so a `0` means "not overdue", not "due today".
+
+## Three things this screen deliberately does not have
+
+- **No sort affordance of any kind.** `<DataTable>`'s `sort` / `onSortChange` props are not passed.
+  The order is a side effect of `?status=` (`{ dueDate: 1 }` for `open` and `overdue`,
+  `{ createdAt: -1 }` for the other four), so a fixed "Due date" indicator would be wrong on four
+  of the six tabs. Saying nothing beats saying something false.
+- **No search box.** `listDebtsQuerySchema` is `.strict()` with no `search`; a box filtering the
+  fetched page client-side would claim to search the debt book while seeing 25 rows of it.
+- **No `customerId` in the URL filters**, even though the API takes it and it is the documented
+  substitute for search. This page has no control that could set or clear one, so a URL-only filter
+  would quietly narrow the list with nothing on screen saying so. A customer's debts already live on
+  their own page.
+
+## No "New debt" button, because there is no create screen
+
+`POST /debts` exists behind `debts:create`, `useCreateDebt` is written, and the artboard draws the
+button — but `app/(app)/debts/new/page.tsx` does not exist and `config/routes.ts` has no row for it.
+A link to a route with no page is a 404 dressed as an affordance, which is the call
+`debt-detail.tsx` already made about its own back-link. There is a `TODO(slice: 3)` where it goes,
+naming the gate (`debts:create`) and the rule (hidden, never disabled).
+
+Note the consequence for the empty state: the unfiltered "No open debts" panel has **no action at
+all**, which is unusual for this codebase. Every other empty state in the app offers the create
+control to whoever holds the permission.
+
+## The back-link on the detail screen is now real — and it found a second stale TODO
+
+`debt-detail.tsx`'s `TODO(slice: 3)` about `/debts` having no page is gone, replaced by a real
+`<Link href={ROUTES.debts}>` in `customer-detail.tsx`'s quiet back-link style. One adjacent comment
+in `<CustomerHeading>` claimed "`/debts` has no page yet" as its reason for linking the customer
+name; that clause was corrected in the same edit because the same change falsified it.
+
+**Left alone, and worth someone's attention:** the *other* `TODO(slice: 3)` in that file — the one
+in `<DebtSource>` saying `/sales/[id]` does not exist — is now stale too. `app/(app)/sales/[id]/page.tsx`
+landed while this task was running, so a sale-born debt could link to its receipt. That is the sales
+agent's file boundary as much as this one's, so it was not touched.
+
+## A testing trap: `NuqsTestingAdapter` freezes the URL unless you ask it not to
+
+`hasMemory` defaults to **`false`**, which means the adapter holds the search params at their
+initial value and every `setFilters` call updates nothing. A test that clicks a tab and then asserts
+the query the hook was called with will pass — against the *old* params — and look like it is
+protecting the "changing the filter resets the page" rule while protecting nothing. `renderPage` in
+`debts-page.test.tsx` passes `hasMemory: true` and carries this note.
+
+## Verification
+
+- `bunx tsc --noEmit` — clean.
+- `bunx vitest run features/debts` — 80 tests, 9 files, green (58 existing + 22 new).
+- `bunx vitest run` (full suite, once) — 468 tests, 57 files, green.
+- `bunx biome check features/debts "app/(app)/debts"` — clean, 27 files.
+- `bunx biome check .` — clean, 273 files. `features/sales/components/counter/` was in flight from
+  another agent while this ran and had no errors at the time of the run; nothing under it was
+  touched.

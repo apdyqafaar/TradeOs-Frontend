@@ -439,15 +439,17 @@ function DebtSource({ debt }: { debt: Debt }) {
     );
   }
 
-  // TODO(slice: 3): link this to `ROUTES.sale(debt.saleId)` once
-  // `app/(app)/sales/[id]/page.tsx` exists.
+  // The label is the sale's id, not its receipt number: nothing in this
+  // payload carries what the counter printed, so the last six characters are
+  // the most honest short handle available, with the whole id in `title`.
   return (
-    <span
-      className="font-mono text-[12px] text-muted-foreground"
+    <Link
+      href={ROUTES.sale(debt.saleId)}
+      className="font-mono text-[12px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
       title={`Sale ${debt.saleId}`}
     >
       Sale …{debt.saleId.slice(-6)}
-    </span>
+    </Link>
   );
 }
 
