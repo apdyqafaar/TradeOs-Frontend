@@ -267,3 +267,181 @@ gets written.
   `features/sales/*`, `components/shared/{money-input,currency-toggle}*` and
   `features/customers/components/{customer-picker,customers-page}*`, which were in flight from other
   agents while this ran. Left untouched.
+
+---
+
+# Building the debt detail screen (`/debts/[id]`, artboard `2g`) — 2026-09-09
+
+Appended by the task that built `features/debts/components/*` and
+`app/(app)/debts/[id]/page.tsx`. Everything above held; nothing here contradicts it. These are the
+things the components had to decide that the contract, the canvas and the data layer between them
+did not answer.
+
+## The two `PAYMENT_EXCEEDS_BALANCE` shapes, written out as sentences
+
+The split is already recorded above; this is what it reads as on screen, so the next person does
+not have to re-derive the wording.
+
+| | 422 (pre-check) | 409 (lost the race) |
+|---|---|---|
+| carries | `errors: { amount }` **and** `details.remaining` | neither |
+| lands on | the amount box, unaided | the amount box, via `PAYMENT_CONFLICT_FIELDS` |
+| copy | *"That is more than the USD 120.50 still owed on this debt."* | *"Someone else recorded a payment against this debt while this one was going through, so this amount no longer fits. Nothing was taken from this one — the balance above is refreshing."* |
+| quotes a balance | yes — **the server's**, from `details.remaining`, never the one on screen | **no** |
+
+The 422's message deliberately *replaces* the API's own field message rather than deferring to it.
+The API says "Payment exceeds the remaining balance", which is true and useless: the reader needs
+the number they have to type under, and only `details.remaining` has it — the figure the screen was
+holding may already be out of date, which is why the server sends its own.
+
+The 409 says nothing about an amount at all. It is the only refusal on this screen that means "the
+number you are looking at is wrong", so it is also the only one whose copy points at the balance
+above rather than at the box. Both variants call `onStale`, which refetches the debt.
+
+**The assertion worth keeping:** `record-payment-dialog.test.tsx` asserts the 409 alert does *not*
+contain `167.75`, the balance the fixture debt holds. Printing a stale figure there is the exact
+failure the 409's empty body exists to prevent.
+
+## "Pay in full" cannot exist in the exchange currency, and the canvas draws it anyway
+
+**What:** artboard `2g` puts "Pay in full" beside the Amount label unconditionally, above a toggle
+offering both codes. In the exchange currency the affordance cannot be honest.
+
+**Evidence:** the balance is stored in the main currency and `amountMain = round2(amount * rate)`.
+With main KES, exchange USD, rate 130 and a balance of KES 1,000, the exact settlement is
+USD 7.6923…. `7.69` converts to 999.70 and leaves 0.30 owing — the debt stays `open`, nowhere near
+the settlement tolerance of 0.004. `7.70` converts to 1,001.00, an overshoot of 1.00, far past the
+0.01 clamp, so it is a 422 `PAYMENT_EXCEEDS_BALANCE`. Neither value settles the debt, and there is
+no third.
+
+**So what:** `RecordPaymentDialog` passes `fillLabel` only when the selected code is the main
+currency; in the exchange currency the `max` hint stands alone. This is the one place the screen
+knowingly departs from the canvas. The alternative is a button labelled "Pay in full" that leaves a
+residue or 422s.
+
+## The exchange-currency `max` hint must **floor**, never round
+
+Same arithmetic, different consequence. `maxIn(remaining, rate)` is
+`Math.floor((remaining / rate) * 100) / 100` — rounding to nearest can land a cent *above* the
+balance, and `amount * rate` then overshoots by up to `0.005 * rate`, which at any rate above 2 is
+past the server's 0.01 tolerance. A max hint that 422s is worse than no hint, because the screen
+suggested the number.
+
+This is also the one **division** in the slice (`fromMain`, `money.ts:31`), and it is correct here:
+main → exchange divides, exchange → main multiplies. The dialog's `toMain` helper multiplies and
+carries the warning; `maxIn` divides and carries this one. They are deliberately two functions.
+
+## An amount over `max` is **not** blocked client-side
+
+`MoneyInput` flags it (`over the max of USD 167.75`, plus `aria-invalid`) but the dialog still
+sends it. The server clamps an overshoot of a cent or less to the balance rather than refusing it
+(`payment.service.ts:41-53`), and that tolerance is not on the wire — a local refusal would invent
+one the API would not make, on the very screen that must not disagree with the server about money.
+The 422 comes back naming the server's own balance, which is a better answer than anything the
+browser could compute.
+
+## `receivedBy` has no name, and the frozen `exchangeRate` has nowhere to go
+
+Two things artboard `2g` draws that the payload cannot fill:
+
+1. **`{{ p.who }}`** — `receivedBy` is a bare Member id and there is no members slice. The row
+   renders an em dash with `title="Received by member <id>"`, following
+   `features/products/components/stock-movements-table.tsx`'s "Who" column rather than inventing a
+   second answer to the same question.
+2. **The rate.** A payment tendered in the exchange currency carries `exchangeRate` frozen at write
+   time, and it is genuinely interesting on a disputed record — but the canvas's second line has
+   room only for `tendered KES 5,000.00`. `formatExchange(...).converted` would print
+   `≈ USD 38.46 @ 130`, a **second** main-currency figure beside `amountMain`, which is the one that
+   actually moved the balance; two main-currency numbers on one row invite the reader to reconcile
+   them. So the row shows the tendered amount alone. Surfacing the rate properly wants `RATE`
+   exported from `lib/format/money.ts` — the export `currency-toggle.tsx` already duplicates four
+   lines of, per `slice3-money-ui.md`. **This is the second caller; a third should do the export.**
+
+## The screen has no way back to a list, on purpose
+
+`ROUTES.debts` is `/debts` and `config/routes.ts` already gates it on `debts:view`, but
+`app/(app)/debts/page.tsx` does not exist — the list is blocked on an open product decision. A
+"Back to debts" link would be a 404 dressed as navigation, so there is none; there is a
+`TODO(slice: 3)` where it belongs. The customer's name in the header is a real `Link` to
+`/customers/[id]`, which exists and is where the rest of what that person owes lives.
+
+The same reasoning applies to `saleId`: `/sales/[id]` does not exist either, so a sale-born debt
+renders `Sale …abc123` as plain text with the full id in `title`, exactly as
+`stock-movements-table.tsx` does. The id is shortened because a debt carries the sale's ObjectId,
+not its receipt number — nothing in this payload knows what the counter printed.
+
+## `useCustomer(undefined)` is how a permission gate goes in front of a query here
+
+`debts:view` does not imply `customers:view`; they are separate rows in the catalog and a custom
+role can hold one without the other. `DebtDetail` passes
+`canViewCustomers ? debt?.customerId : undefined`, which `useCustomer`'s `enabled: Boolean(id)`
+turns into "no request" rather than a guaranteed 403.
+
+This is the cheap version of the split `customer-picker.tsx` needed. That component had to become
+two components because `useCustomers` takes only `CustomerListParams` and has no `enabled` escape
+hatch, so an early `return` before it would change the hook count as the session resolved.
+`useCustomer`'s optional id **is** that escape hatch. **Prefer this shape when the hook already has
+one; only split the component when it does not.**
+
+Without a name, nothing is invented: the heading becomes the word "Debt" and the customer id is
+printed in mono. A fabricated placeholder would be worse than an id somebody can paste into a
+support ticket.
+
+## `onStale` refetches the debt and not the payments
+
+The dialogs call `onStale` on every refusal that means the debt moved underneath them — the 409
+race, `DEBT_NOT_OPEN`, and a 404. `DebtDetail` wires it to `useDebt(...).refetch()` only.
+
+The payments list is deliberately not refetched with it. The balance is what the refusals are
+about; the competing payment that won a race is not this screen's own write, and reaching it would
+mean either `useQueryClient` in a component (invalidation belongs in the hooks layer) or a second
+`useDebtPayments` call whose params — and therefore whose query key — differ from the timeline's,
+because the timeline's page number lives in `?payPage`. The timeline refreshes itself whenever one
+of its own mutations lands, which covers every case the user caused.
+
+## Design decisions the tokens did not settle
+
+- **The write-off confirm is a solid red.** The canvas draws `#C0392B` with off-white text, which is
+  `--destructive` / `--destructive-foreground`. The vendored `destructive` button variant is a
+  *soft* tint (`bg-destructive/10`) — right for a reversible destructive action and wrong here,
+  since there is no un-write-off endpoint. The variant is overridden with the tokens, not the hex.
+- **The progress bar gained a second segment.** The canvas draws one green bar because it draws a
+  debt with nothing written off. A written-off debt would otherwise show a bar that stops at 25%
+  with no hint that the other 75% is never coming, so `writtenOffAmount / principal` gets its own
+  `--muted-3` segment and the caption reads `40% paid · 60% written off`. Both segments are shares
+  of `principal`, which is why they can never sum past the track: the backend asserts
+  `principal === paid + remaining + writtenOffAmount` after every mutation.
+- **The progress bar is `aria-hidden`.** `role="progressbar"` would need an `aria-valuenow`, and
+  biome's `useSemanticElements` asks for a `<progress>` element for that role anyway. The caption
+  beside it already carries the same fact as text, so announcing the bar would say it twice.
+- **The status pill has four members and no fifth.** `STATUS_STYLES` is
+  `Record<DebtStatus, string>`, so adding `overdue` is a compile error rather than a badge that
+  never appears. Overdue is a separate `--destructive-soft` badge rendered from `debt.isOverdue`
+  and `debt.daysOverdue`.
+- **Both actions are hidden by *state* as well as by permission.** `payments:create` and
+  `debts:write_off` gate them, and so does `status === "open"` — plus `remaining > 0` for the
+  write-off, matching `writeOffDebtById`'s guard. A button whose every press is a guaranteed 409 is
+  worse than no button: the repo's hide-don't-disable rule applied to a second axis.
+- **Voiding is an inline confirm inside the timeline row, not a third dialog.** `voidSchema` is one
+  required field, the row is the context, and the refusal has to land beside the control that was
+  refused. The control is hidden entirely on a written-off debt, where 409 `DEBT_WRITTEN_OFF` is
+  certain, with one muted line saying why.
+
+## A React Query detail that made a test lie
+
+A query disabled by an `undefined` id reports `isPending: true` **for ever** in v5 (status
+`"pending"`, fetchStatus `"idle"`) and never carries data. A `useCustomer` mock that ignored its
+argument and always returned data made `DebtDetail` look as though it had resolved a customer it
+never asked for: the "does not fetch a customer it has no permission to read" test passed its
+`toHaveBeenCalledWith(undefined)` assertion and then found the name on screen anyway. The mock is
+now argument-aware and returns `{ isPending: true, data: undefined }` for a disabled call, which is
+also what exercises the `canViewCustomers && customer.isPending` guard on the header skeleton.
+
+## Verification
+
+- `bunx tsc --noEmit` — clean.
+- `bunx vitest run features/debts` — 58 tests, 6 files, green.
+- `bunx vitest run` (full suite, once) — 373 tests, 49 files, green.
+- `bunx biome check .` — 3 errors, **none in `features/debts` or `app/(app)/debts`**: two formatter
+  diffs and one `useSemanticElements` in `features/sales/components/counter/*`, which was in flight
+  from another agent while this ran. The tree was clean when this task started. Left untouched.

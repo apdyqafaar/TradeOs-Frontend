@@ -21,30 +21,60 @@ submission, so the page has no way to tell a new invitee from a returning one. O
 ignore name/password for an existing user, to prompt them to sign in instead of filling the form, or
 to accept it. This is a backend product call.
 
-### The Debts list cannot show customer names — the screen the design draws is not buildable today
-**Status: open, needs a product call. Verified directly in backend source.** Artboard `2f` draws
-the Debts table with **customer name over phone** as its first column. `GET /debts` cannot supply
-it: `publicDebt` (`Backend/src/controller/debt.controller.ts:15-41`) emits `customerId` as a bare
-id string with no name and no phone, and `listDebtsQuerySchema`
-(`src/validators/debt.validation.ts`) is `.strict()` accepting only `page`, `limit`, `status` and
-`customerId` — **no search, no date window, no sort**.
+### The Debts list customer column — RULED and shipped
+**Status: closed 2026-09-09. The owner chose to populate the customer on `GET /debts`.**
 
-The Overview's debts panel already shows names, but only because `GET /dashboard` pre-joins the
-customer in `src/services/dashboard/debts.section.ts`. The list endpoint does no such join.
+Artboard `2f` draws the Debts table with the customer's name over their phone as its first
+column. `GET /debts` answered a bare `customerId`, so no client could render it without one
+request per row — a debt-chasing screen that could not name who owes the money. Three options were
+put up: populate server-side, join client-side, or redraw the column. The ruling was to populate.
 
-Three ways out, and this is your call:
-1. **Populate the customer on `GET /debts`** (name + phone), mirroring what the dashboard section
-   already does. Smallest change, matches the design exactly, and the pattern exists in the
-   codebase.
-2. **Join client-side** by fetching customers separately. Workable for a small trader but it is a
-   second request whose page size has to cover every customer appearing in the debts page, and it
-   degrades silently once a business grows.
-3. **Redraw the column** to something the API can answer today, which means a debts table that
-   does not name the person who owes the money — for a screen whose entire purpose is chasing
-   debts.
+Shipped as `Backend` `a117e5e`, following the pattern already in the codebase:
+`services/dashboard/debts.section.ts` solved the same problem for the Overview's overdue panel
+with a single `$in` over the distinct customer ids in the page. `findCustomerNamesByIds` is that
+query. Not a `$lookup` per row, and not a join inside the query, which would have disturbed the
+indexed sort in `findDebtsByOrganization`.
 
-Sorting and search are the same conversation: with no sort param, a fixed "Due date" column
-indicator is wrong on four of the six status filters.
+Three things about the shape, all pinned by backend tests:
+
+- `customer` is **optional and absent** rather than blank when unresolved, so a row can never
+  render an empty string that reads as a nameless customer.
+- The lookup filters on `organizationId` as well as the ids, so a debt pointing at another
+  tenant's customer resolves to nothing instead of leaking a name and phone number. That test was
+  **break-tested**: dropping the tenant filter fails it and only it.
+- `GET /debts/:id` deliberately still sends a bare `customerId`. A detail screen already fetches
+  that one customer for their address and notes. A test pins the asymmetry so it cannot drift.
+
+**Search and sort were deliberately NOT added.** Artboard `2f` draws neither, and the change was
+scoped to what the blocked screen actually needed. The consequence is still live and worth knowing:
+`GET /debts` has no sort parameter — ordering is a side effect of the status filter — so a fixed
+"Due date" column indicator would be wrong on four of the six filters.
+
+
+### A sale freezes its exchange rate but not its main currency, so old receipts can be re-labelled
+**Status: open, needs a backend call. Verified in models and validators.** A sale stores
+`payment.currency` (what the customer actually handed over) and `payment.exchangeRate`, frozen —
+`Backend/src/db/models/sale.model.ts:23-24` says so in as many words. But `subtotal`, `total`,
+`amountPaidMain` and `amountDue` are all "in main currency" with **no record of which currency
+that was**. Nothing on the Sale or the Payment stores it.
+
+`updateCurrencySchema` lets an owner change `mainCurrency` at any time
+(`src/validators/organization.validation.ts:86`). The moment they do, every historical receipt
+re-labels its totals with the new code: a sale genuinely rung up as KES 223.75 renders as
+USD 223.75. The amounts do not move; only the word next to them changes, which is the worse
+failure — the number stays plausible.
+
+**One partial mitigation, worth knowing before designing a fix.** When `exchangeRate === 1` the
+tender *was* in the main currency, so `payment.currency` **is** the main currency as it stood at
+sale time and the receipt can be labelled correctly from the sale alone. It is only the
+exchange-currency tenders — where `payment.currency` holds the *other* code — for which the main
+currency is unrecoverable. So the gap is real but narrower than "every sale".
+
+The fix is a stored `payment.mainCurrency` (or an organization-level currency history). Until
+then, a receipt for an exchange-currency tender is labelled with today's main currency and there is
+no way for a client to know better. Recorded rather than worked around, because a frontend
+work-around here would be guessing at what a financial record says.
+
 
 ### Day one is a long column of empty panels
 **Status: open.** Artboard `1e` draws only "First steps" and "Nothing to chart yet" for a

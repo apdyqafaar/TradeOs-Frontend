@@ -63,8 +63,30 @@ export type MainCurrencyAmount = number;
  */
 export interface Debt {
   id: ObjectId;
-  /** Bare id string. Join against `features/customers` for a name. */
+  /** Bare id string, on every debt response. */
   customerId: ObjectId;
+  /**
+   * Name and phone for the customer, **only on `GET /debts`**.
+   *
+   * Added in `Backend` commit `a117e5e` because the Debts table's first
+   * column is the customer's name over their phone (artboard `2f`) and the
+   * list previously answered a bare `customerId` — no client could render
+   * that column without one request per row. The server resolves it in one
+   * `$in` query over the distinct ids in the page, mirroring what
+   * `services/dashboard/debts.section.ts` already did for the Overview.
+   *
+   * **Optional on purpose, in two different senses.** The single-debt
+   * responses (`GET /debts/:id`, `POST /debts`, write-off) deliberately do
+   * NOT send it — a detail screen is already fetching that customer for their
+   * address, so a second copy would be a shape to keep in sync for no gain.
+   * And within the list, a customer the server could not resolve leaves the
+   * key **absent** rather than blank, so a row never renders an empty string
+   * that looks like a nameless customer. Both are pinned by backend tests.
+   *
+   * The lookup is tenant-filtered, so a debt pointing at another
+   * organization's customer resolves to nothing rather than leaking a name.
+   */
+  customer?: { id: ObjectId; name: string; phone: string };
   source: DebtSource;
   /** Present only when `source === "sale"`. A bare id string. */
   saleId?: ObjectId;

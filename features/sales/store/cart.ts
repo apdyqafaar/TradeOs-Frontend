@@ -99,11 +99,19 @@ export interface CartState extends CartContents {
    * sale a 422, so the merge is the endpoint's rule showing through, not a
    * convenience. A re-scan at the counter is the common case.
    *
-   * The merged quantity is passed through `round3` because `0.1 + 0.2` is
-   * `0.30000000000000004`, which `isQuantity` rejects (`money.ts:42-47`) — the
-   * sale would be refused for a quantity nobody typed. Rounding here cancels
-   * float noise from an addition; it never rounds a value the cashier entered
-   * (see `setQuantity`).
+   * The merged quantity is passed through `round3` — but **not** for the
+   * reason this comment used to give. It claimed `isQuantity` rejects
+   * `0.1 + 0.2`; it does not. `isQuantity` compares
+   * `Math.abs(n * 1000 - Math.round(n * 1000)) < 1e-6`
+   * (`../Backend/src/lib/money.ts:42-47`), and `0.30000000000000004` sits far
+   * inside that tolerance. Verified by running the real predicate.
+   *
+   * `round3` earns its place twice over anyway. It is what reaches the
+   * **stored** quantity, matching the server's own `round3`; and it is what a
+   * cashier reads, because `String(1.117 + 0.001)` is
+   * `"1.1179999999999999"` — seventeen characters of float noise in a 52px
+   * box, for an addition nobody asked to see. It cancels noise from a merge
+   * and never rounds a value the cashier typed (see `setQuantity`).
    *
    * A merge deliberately does **not** reset `unitPrice` or `discount`: re-scanning
    * an item is not a reason to discard the price the cashier just negotiated.
