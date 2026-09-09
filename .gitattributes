@@ -1,0 +1,14 @@
+# Check every text file out with LF, on every platform.
+#
+# Without this, `core.autocrlf=true` — the default from Git for Windows'
+# installer, and what this machine is set to — rewrites line endings to CRLF on
+# checkout. Biome's formatter defaults to LF and rejects the whole file, so a
+# plain `git checkout <file>` is enough to turn a clean working tree into a
+# failing lint. That happened during Slice 3: reverting one file made biome
+# fail on it, and the fix looked like a content change when nothing about the
+# content had changed.
+#
+# `text=auto` still lets Git decide what is text and leave binaries alone;
+# `eol=lf` pins the working-tree ending so the repo, the formatter and CI all
+# agree.
+* text=auto eol=lf

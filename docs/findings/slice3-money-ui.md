@@ -193,22 +193,41 @@ about a term whose answer is not on screen.
 a phone number, so try fewer characters." Anyone tempted to add `“{term}”` has to reconcile the two
 values first.
 
-## ARIA's combobox pattern has no HTML equivalent, and biome says so twice
+## Building ARIA's combobox pattern past biome's recommended a11y rules
 
-**What:** the result list is `role="listbox"` on a `<ul>` with `role="option"` on each `<li>`, and
-selection happens through `aria-activedescendant` while focus stays in the text box. Biome's
-recommended set flags both halves.
+**What:** the result list is a listbox whose selection moves through `aria-activedescendant` while
+focus never leaves the text box. Written the obvious way — `<ul role="listbox">` with
+`<li role="option">` — biome's recommended set raises **five** errors: `useSemanticElements`,
+`noNoninteractiveElementToInteractiveRole` (twice, once per element), `useFocusableInteractive` and
+`useKeyWithClickEvents`. Four of the five are avoidable; only the last needs a suppression.
 
-**Evidence:** two suppressions in `customer-picker.tsx` — `lint/a11y/useSemanticElements` (no HTML
-element carries the listbox/option pairing) and `lint/a11y/useKeyWithClickEvents` (keys are handled
-on the input, which is the pattern's own contract; an option that took focus would pull the caret
-out of the search box).
+**Evidence:** the shape `customer-picker.tsx` ended up with, and what each change bought:
 
-**So what:** they are the correct suppressions, not a shortcut. Do not "fix" them by adding key
-handlers to the options or by turning the options into buttons — either one breaks the pattern.
-The list is rendered inline rather than in a popover, which is what lets it skip outside-click
-handling, a focus trap and a portal; `aria-expanded` is hard-coded `"true"` because the list never
-collapses, and claiming otherwise would describe a control that is not there.
+- **`<div>` instead of `<ul>`/`<li>`.** `div` is role-neutral, so
+  `noNoninteractiveElementToInteractiveRole` does not fire, and — empirically —
+  `useSemanticElements` does not fire for `listbox`/`option` on a `div` either, though it *does*
+  fire for `role="status"` on one.
+- **`<output>` instead of `<div role="status">`** for the loading region: `output` carries that
+  role implicitly, which is what the rule was asking for.
+- **`tabIndex={-1}` on each option** satisfies `useFocusableInteractive` and is what the pattern
+  wants anyway — focusable by script, never by tab.
+- **No `role="group"` on the chosen-customer row.** It tripped `useSemanticElements` (which wants a
+  `<fieldset>`) for an announcement that adds nothing: the caption is the element immediately
+  before it, which is how every other labelled value in this repo reads.
+- One suppression survives: `lint/a11y/useKeyWithClickEvents` on the option.
+
+**So what:** two things to carry forward. First, **a biome suppression only applies to the line
+immediately below it** — a `// biome-ignore …:` line followed by three more `//` lines of
+explanation suppresses the *comment*, and biome then reports both `suppressions/unused` and the
+original error, which reads as if the rule were unsuppressable. Put the explanation above and the
+`biome-ignore` last. Second, do not "fix" the remaining suppression by giving options their own key
+handlers or turning them into buttons; keys belong on the input and an option that took focus would
+pull the caret out of the search box.
+
+Unrelated to the lint, and worth knowing: the list renders inline rather than in a popover, which is
+what lets it skip outside-click handling, a focus trap and a portal. `aria-expanded` is hard-coded
+`"true"` for the same reason — the list never collapses, and claiming otherwise would describe a
+control that is not there.
 
 ## `CurrencyToggle` renders nothing while the config is still loading
 
