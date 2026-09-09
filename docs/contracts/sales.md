@@ -55,7 +55,7 @@ Exact query params:
 | `soldBy` | 24-hex ObjectId string (a **Member** id, not a user id) | none | `sale.validation.ts:46` |
 | `period` | `"today" \| "week" \| "month" \| "year"` | none | `common.validation.ts:68` |
 | `from` | `"YYYY-MM-DD"` (calendar date, **not** a full ISO datetime) | none | `common.validation.ts:46,69` |
-| `to` | `"YYYY-MM-DD"`, **exclusive** upper bound (`$lt`, not `$lte`) | none | `sale.actions.ts:34,48` |
+| `to` | `"YYYY-MM-DD"`, **inclusive** calendar day — send the last day you want to see | none | `lib/period.ts:89-93` |
 
 Refinements: `period` and `from`/`to` are mutually exclusive (422 if both
 given), and `from`/`to` must be supplied together (422 if only one)
@@ -509,3 +509,42 @@ there is no `PRODUCT_NOT_FOUND` vs `PRODUCT_CROSS_TENANT` split.
     given line — that determination is entirely server-side (based on the
     snapshot taken at sale time, which may since have diverged from the
     product's live `trackStock` flag).
+
+---
+
+## Corrections (2026-09-09, found while building `features/sales` against this file)
+
+**1. `to` is an INCLUSIVE calendar date. The table above previously said exclusive.**
+`resolvePeriod` parses `to` as the start of that day and then advances it itself before the `$lt`:
+`to: new Date(addDays(toStart, 1).getTime())` (`Backend/src/lib/period.ts:89-93`). The `$lt` in
+`sale.actions.ts` is real, but it applies to a bound the server has *already* moved. So a client
+sends the last day it wants to see. **A frontend that "compensates" by sending `to + 1`
+over-selects by a full day** — every "this month" filter would quietly include the first of the
+next month.
+
+**2. The error table has no 400 row, and `GET /sales` can emit three.** All three come from
+`resolvePeriod`, all are `BadRequestError` → HTTP 400, and **none of them exists in the frontend's
+`API_ERROR_CODE`** (`lib/api/errors.ts`), so they arrive unmapped:
+
+| Code | Condition | Source |
+|---|---|---|
+| `INVALID_PERIOD` | `from` after `to`, or only one of the pair given | `period.ts:79,84` |
+| `PERIOD_TOO_LONG` | range exceeds **366 days** (`MAX_PERIOD_DAYS`, `period.ts:33`). The test is `days + 1 > 366`, so exactly 366 passes and 367 fails | `period.ts:86-88` |
+| `INVALID_DATE` | not `YYYY-MM-DD`, or not a real calendar date | `period.ts:51,58` |
+
+The 366-day cap is documented nowhere else and makes a "last 2 years" range impossible. The same
+three codes serve every report endpoint, so this is not sales-specific.
+
+**3. `dueDate` needs a `Z` suffix specifically, not merely "a full ISO datetime."** Zod's
+`.datetime()` defaults to `offset: false`, so `2026-09-21T12:00:00+03:00` is a 422 exactly as a
+bare `2026-09-21` is. This bites because `TZDate.prototype.toISOString()` emits the offset form and
+a `date-fns` `XXX` format string is the natural wrong choice. Build the instant, then serialise it
+through a plain `Date`.
+
+**4. `round2` is not "half away from zero" below zero**, whatever the comment in `money.ts` says.
+`Math.round` breaks ties toward `+Infinity`, so `round2(-0.005)` is `-0` — which is **not** `< 0`
+and therefore passes the server's own negative-total guard. Verified numerically against the real
+function. Mirror the formula exactly; do not "fix" it.
+
+**5. `GET /sales` has no `search` param and there is no `GET /sales/number/:number`.** The query
+schema is `.strict()`. The design brief's "search by receipt number" cannot be built today.

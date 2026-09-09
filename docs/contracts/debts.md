@@ -447,3 +447,39 @@ later needs the **sale-linked debt creation path** (`source:"sale"`, `saleId` po
 **cancel-debt-on-voided-sale** flow (`cancelDebt`, `debt.actions.ts:103-112`), those are outside
 this scope (not one of the 7 endpoints) and were only skimmed, not audited to the same depth —
 treat that path as unverified until it's explicitly in scope.
+
+---
+
+## Corrections (2026-09-09, found while building `features/debts` against this file)
+
+Every behavioural claim above was re-verified against the validators, controllers, services,
+actions and models and **held**. Some citations drift a line or two after later edits (the
+write-off `$set` cited as `128-140` is `130-137` inside an update spanning `126-141`), but no claim
+changed meaning. Two consequential things were **omitted**:
+
+**1. The 422 `PAYMENT_EXCEEDS_BALANCE` also carries `errors: { amount }`, not only
+`details.remaining`.** `payment.service.ts:46-51` passes a field map as `ValidationError`'s first
+argument, and it reaches `ApiError.fieldErrors`. So the 422 already lands on the amount box without
+help. Only the 409 — the concurrency-race variant — needs the field mapped by hand, and there the
+honest message is "someone else just paid against this debt", **not** a stale remaining figure,
+because the 409 carries no `details`.
+
+**2. `z.string().datetime()` rejects an ISO string with an offset, not just a bare date.** Zod
+defaults to `offset: false`. This compounds with a timezone trap: `TZDate.prototype.toISOString()`
+emits exactly the offset form, and midnight-UTC is *before* start-of-day for any business west of
+Greenwich, while the server compares against `startOfDayIn(tz, now)`. So the naive
+calendar-date-to-ISO conversion fails twice over — once on format, once on the boundary. Build
+noon in the business's timezone and round-trip through a plain `Date` for the `Z` form.
+
+## A gap this contract cannot paper over
+
+**`GET /debts` cannot render the table artboard `2f` draws.** Verified directly:
+`listDebtsQuerySchema` (`Backend/src/validators/debt.validation.ts`) is `.strict()` and accepts
+only `page`, `limit`, `status` and `customerId` — **no `search`, no date window, no sort param** —
+and `publicDebt` (`debt.controller.ts:15-41`) emits `customerId` as a bare id string with **no
+name and no phone**. The artboard's first column is customer name over phone.
+
+The Overview's debts panel works only because `GET /dashboard` pre-joins the customer in
+`src/services/dashboard/debts.section.ts`; the list endpoint does no such join. Sorting is also a
+side effect of the status filter rather than a parameter, so a fixed "Due date" column indicator
+would be wrong on four of the six filters.

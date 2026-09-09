@@ -21,6 +21,31 @@ submission, so the page has no way to tell a new invitee from a returning one. O
 ignore name/password for an existing user, to prompt them to sign in instead of filling the form, or
 to accept it. This is a backend product call.
 
+### The Debts list cannot show customer names — the screen the design draws is not buildable today
+**Status: open, needs a product call. Verified directly in backend source.** Artboard `2f` draws
+the Debts table with **customer name over phone** as its first column. `GET /debts` cannot supply
+it: `publicDebt` (`Backend/src/controller/debt.controller.ts:15-41`) emits `customerId` as a bare
+id string with no name and no phone, and `listDebtsQuerySchema`
+(`src/validators/debt.validation.ts`) is `.strict()` accepting only `page`, `limit`, `status` and
+`customerId` — **no search, no date window, no sort**.
+
+The Overview's debts panel already shows names, but only because `GET /dashboard` pre-joins the
+customer in `src/services/dashboard/debts.section.ts`. The list endpoint does no such join.
+
+Three ways out, and this is your call:
+1. **Populate the customer on `GET /debts`** (name + phone), mirroring what the dashboard section
+   already does. Smallest change, matches the design exactly, and the pattern exists in the
+   codebase.
+2. **Join client-side** by fetching customers separately. Workable for a small trader but it is a
+   second request whose page size has to cover every customer appearing in the debts page, and it
+   degrades silently once a business grows.
+3. **Redraw the column** to something the API can answer today, which means a debts table that
+   does not name the person who owes the money — for a screen whose entire purpose is chasing
+   debts.
+
+Sorting and search are the same conversation: with no sort param, a fixed "Due date" column
+indicator is wrong on four of the six status filters.
+
 ### Day one is a long column of empty panels
 **Status: open.** Artboard `1e` draws only "First steps" and "Nothing to chart yet" for a
 brand-new business, and says nothing about the rest. But a new owner still receives `debts`,
