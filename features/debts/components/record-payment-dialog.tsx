@@ -25,13 +25,24 @@ import {
 import { formatMoney } from "@/lib/format/money";
 
 /**
- * `round2` from `../Backend/src/lib/money.ts:18`, for the preview only.
+/**
+ * `round2`, transcribed from `../Backend/src/lib/money.ts:18` — **including
+ * its `Number.EPSILON`**, which this copy previously dropped.
  *
- * `Math.round` is half-up and the backend's is half-away-from-zero; every
- * amount in this dialog is positive, where the two agree. Nothing this returns
- * is ever sent — the API recomputes it from `amount` and its own live rate.
+ * That omission was defensible while nothing here did more than preview a
+ * number. It is not any more: this function now decides whether a payment is
+ * refused before it is sent, against the server's 0.01 overshoot tolerance, so
+ * a copy that rounds differently from the server can refuse an amount the API
+ * would take. The divergence is real — `Math.round(0.145 * 100) / 100` is
+ * `0.14` where the server gives `0.15`.
+ *
+ * Kept local rather than imported from `features/sales/store/cart.ts`: a debts
+ * screen reaching into the sales feature for arithmetic is the wrong
+ * dependency. This is the third copy in the repo, which is the point at which
+ * it should move to `lib/` — noted in `docs/findings/slice3-debts-data.md`.
  */
-const round2 = (value: number): number => Math.round(value * 100) / 100;
+const round2 = (value: number): number =>
+  Math.round((value + Number.EPSILON) * 100) / 100;
 
 /**
  * `toMain` (`money.ts:28`) — it **multiplies**, and getting this backwards is
@@ -65,6 +76,14 @@ const rateFor = (
  * Flooring can leave a sub-unit residue instead, which is why "Pay in full" is
  * not offered in the exchange currency — see the note on the component.
  */
+/**
+ * The server's own slack, copied so the browser refuses exactly what the API
+ * refuses and no more — `OVERSHOOT_TOLERANCE`,
+ * `Backend/src/services/payment.service.ts:22`. An overshoot at or under this
+ * is clamped to the balance and accepted; a larger one is a 422.
+ */
+const SERVER_OVERSHOOT_TOLERANCE = 0.01;
+
 const maxIn = (remaining: number, rate: number): number | undefined => {
   if (rate === 1) return remaining;
   if (!Number.isFinite(rate) || rate <= 0) return undefined;
@@ -252,11 +271,22 @@ export function RecordPaymentDialog({
      * the schema collapses a blank one to `undefined`, and `JSON.stringify`
      * then drops the key, which is what "no note" means to the API.
      *
-     * An amount over `max` is deliberately **not** blocked here. The server
-     * clamps an overshoot of a cent or less rather than refusing it, and that
-     * tolerance is not on the wire — a local refusal would invent one the API
-     * would not make. `MoneyInput` already flags the amount as over the max,
-     * and the 422 comes back naming the server's own balance.
+     * An amount the debt cannot absorb is refused **here**, before the request.
+     * The owner asked for this on 2026-09-09: the server was already the only
+     * thing stopping someone paying 200.00 against a 167.75 balance, and a
+     * refusal that costs a round trip is a refusal the cashier feels.
+     *
+     * The threshold mirrors the server's exactly rather than being tightened
+     * to `remaining`. `payment.service.ts:41-53` clamps an overshoot of
+     * `OVERSHOOT_TOLERANCE` (0.01) **to** the balance and accepts it; only a
+     * larger one is refused. Blocking at `remaining` itself would invent a
+     * refusal the API does not make and reject a cent of float drift the
+     * server would happily absorb — which was the reason this was left to the
+     * server in the first place. The tolerance is compared in MAIN currency,
+     * because that is the side the server compares.
+     *
+     * The 422 handling stays: this check reads `debt.remaining` as this screen
+     * last fetched it, and a concurrent payment can move it underneath us.
      */
     const parsed = recordPaymentSchema.safeParse({
       amount,
@@ -275,6 +305,18 @@ export function RecordPaymentDialog({
         }
       }
       setIssues(next);
+      return;
+    }
+
+    // Mirrors `OVERSHOOT_TOLERANCE` in `Backend/src/services/payment.service.ts:22`.
+    const overshoot = round2(toMain(parsed.data.amount, rate) - debt.remaining);
+    if (overshoot > SERVER_OVERSHOOT_TOLERANCE) {
+      setIssues({
+        amount: `That is more than the ${formatMoney(
+          debt.remaining,
+          mainCurrency,
+        )} still owed on this debt.`,
+      });
       return;
     }
 

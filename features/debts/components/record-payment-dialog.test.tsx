@@ -165,6 +165,60 @@ describe("RecordPaymentDialog", () => {
     expect(onStale).toHaveBeenCalled();
   });
 
+  it("refuses more than the balance without spending a round trip on it", async () => {
+    // The owner asked for this on 2026-09-09. The server already refused it
+    // (PAYMENT_EXCEEDS_BALANCE); what was missing is that the browser let the
+    // request go at all, so the cashier paid a round trip to be told no.
+    render(<RecordPaymentDialog {...open()} />);
+
+    await userEvent.type(screen.getByLabelText("Amount"), "200");
+    await userEvent.click(
+      screen.getByRole("button", { name: /record payment/i }),
+    );
+
+    expect(
+      await screen.findByText(/more than the USD 167.75 still owed/i),
+    ).toBeInTheDocument();
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("still sends an overshoot the server would clamp rather than refuse", async () => {
+    // The boundary that makes the guard honest. `payment.service.ts:41-53`
+    // clamps an overshoot of 0.01 TO the balance and accepts it, so refusing
+    // at `remaining` itself would invent a stricter rule than the API has.
+    // 167.76 against a 167.75 balance must still be sent.
+    render(<RecordPaymentDialog {...open()} />);
+
+    await userEvent.type(screen.getByLabelText("Amount"), "167.76");
+    await userEvent.click(
+      screen.getByRole("button", { name: /record payment/i }),
+    );
+
+    expect(
+      screen.queryByText(/still owed on this debt/i),
+    ).not.toBeInTheDocument();
+    expect(mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("measures the overshoot in main currency, not the tendered one", async () => {
+    // A Kenyan shop with a KES 167.75 balance taking dollars at 130: USD 2.00
+    // is KES 260.00 and must be refused, even though 2.00 looks tiny beside
+    // 167.75. Comparing the raw typed number would let it through.
+    config.mockReturnValue(twoCurrencies);
+    render(<RecordPaymentDialog {...open()} />);
+
+    await userEvent.click(screen.getByRole("radio", { name: "USD" }));
+    await userEvent.type(screen.getByLabelText("Amount"), "2");
+    await userEvent.click(
+      screen.getByRole("button", { name: /record payment/i }),
+    );
+
+    expect(
+      await screen.findByText(/more than the KES 167.75 still owed/i),
+    ).toBeInTheDocument();
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
   it("refuses an empty amount before anything is sent", async () => {
     render(<RecordPaymentDialog {...open()} />);
 
