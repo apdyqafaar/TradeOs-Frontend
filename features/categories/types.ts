@@ -24,11 +24,10 @@ export interface Category {
    * Electronics — and three of them are ordinary, deletable categories.
    *
    * The one category DELETE actually refuses (409 `CATEGORY_PROTECTED`) is
-   * the one carrying `key: "general"`, and **`key` is not on the wire**. So
-   * no client can tell the protected category from the other three seeded
-   * ones. `<CategoryTab />` gates its delete button on `isDefault` anyway,
-   * per the plan, and handles `CATEGORY_PROTECTED` inline in case the guess
-   * is wrong — see `docs/findings/s2-task-02.md`.
+   * the one carrying `key: "general"` — **use `key`, not this field.** It was
+   * absent from the response until `Backend` commit `a70ebef`, which put it
+   * on the wire precisely because no client could otherwise tell the
+   * protected category from the other three seeded ones.
    *
    * The same trap applies to picking "the default category" for a product
    * form: `categories.find((c) => c.isDefault)` on a list sorted by name
@@ -36,6 +35,16 @@ export interface Category {
    * `POST /products` is the only reliable way to land in General.
    */
   isDefault: boolean;
+  /**
+   * `"general"` on exactly one category per organization — the fallback a
+   * product lands in when none is given, and the only one DELETE refuses.
+   * `null` on every other category, seeded or not.
+   *
+   * This is the field to gate a delete control on. Gating on `isDefault`
+   * instead marks all four seeded categories protected and offers a delete
+   * on none of them.
+   */
+  key: "general" | null;
   /**
    * Products of any status pointing at this category, counted server-side in
    * one aggregate for the whole list. It is what makes a delete an informed

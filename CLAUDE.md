@@ -191,3 +191,26 @@ Two entries there change how you work and are worth repeating here:
 - **Money direction.** `exchangeRate` is units of *main* per one unit of *exchange*, so converting
   to the main currency **multiplies**. The inverse reads more naturally out loud, which is exactly
   how it shipped backwards once.
+
+## Compact Instructions
+
+Auto-compaction is configured in `~/.claude/settings.json`: `autoCompactEnabled: true` with
+`autoCompactWindow: 800000` — a **token count, not a percentage**, which is 80% of this model's
+1M window. The schema requires an integer between 100,000 and 1,000,000, so a value like `80` is
+rejected outright.
+
+When compacting this project, preserve in this order:
+
+1. **Open decisions in `docs/FINDINGS.md` §1** and any ruling the owner has made — the contrast
+   ruling, the slice scope, anything answered through a question. A re-litigated decision costs
+   more than the context it saved.
+2. **Bugs found and their evidence**, especially ones that shipped green: the money-direction
+   inversion, the dropped two-factor challenge token, the partial-update defaults. Each was
+   invisible to the test suite, so a summary that drops them loses the only record.
+3. **Which slice and task are in flight**, what has been pushed, and what any running agent owns.
+4. **Corrections to the plan or the brief** — several field names and API claims were wrong and
+   were fixed in place; the fix matters more than the narration around it.
+
+Safe to drop: tool output already written to a file, file listings, the step-by-step of work that
+landed and was committed, and any agent report whose durable content is already in
+`docs/findings/`.

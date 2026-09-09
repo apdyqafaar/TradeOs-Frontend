@@ -1,6 +1,6 @@
 # API route map
 
-**All 111 endpoints, extracted from `../Backend/src/routes/v1/*.route.ts` on 2026-09-07 and
+**All 112 endpoints, extracted from `../Backend/src/routes/v1/*.route.ts` on 2026-09-07 (plus `GET /uploads/:id`, added 2026-09-09) and
 verified against the source, not from memory.** This is the contract the frontend codes against.
 
 ## Rules
@@ -226,5 +226,6 @@ call, and reads `requirePermission(PERMISSIONS.X)` and `requireVerifiedEmail` ou
 | Method | Path | Requires |
 |---|---|---|
 | GET | `/uploads` | uploads:create |
+| GET | `/uploads/:id` | uploads:create |
 | POST | `/uploads` | uploads:create |
 | DELETE | `/uploads/:id` | uploads:create |

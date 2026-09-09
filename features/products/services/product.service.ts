@@ -119,10 +119,10 @@ export const create = (input: CreateProductInput): Promise<Product> =>
  * and is discarded otherwise. And it cannot archive: `status` accepts only
  * `"active"`, for un-archiving.
  *
- * It also re-applies its own defaults to whatever arrives, so a body that
- * omits `unit` or `trackStock` resets them to `"pcs"` and `true`. Always send
- * both, carrying the product's current values — see
- * `docs/findings/s2-task-01.md`.
+ * It used to re-apply its own defaults to whatever arrived, so a body that
+ * omitted `unit` or `trackStock` reset them to `"pcs"` and `true`. That was a
+ * backend defect, found here and fixed there (`Backend` commit `cb46775`).
+ * Send only what changed; do not resend the pair defensively.
  */
 export const update = (
   id: ObjectId,

@@ -39,6 +39,7 @@ export const ROUTES = {
   newSale: "/sales/new",
   sale: (id: string) => `/sales/${id}`,
   products: "/products",
+  productNew: "/products/new",
   product: (id: string) => `/products/${id}`,
   productImport: "/products/import",
   customers: "/customers",
@@ -189,6 +190,10 @@ export const ROUTE_PERMISSIONS: Readonly<Record<string, Permission>> = {
   [ROUTES.sales]: PERMISSIONS.SALES_VIEW,
   [ROUTES.newSale]: PERMISSIONS.SALES_CREATE,
   [ROUTES.products]: PERMISSIONS.PRODUCTS_VIEW,
+  // Both stricter than their `/products` parent, and both need it: a Seller
+  // holds `products:view` and would otherwise reach a form whose every submit
+  // is a 403.
+  [ROUTES.productNew]: PERMISSIONS.PRODUCTS_CREATE,
   [ROUTES.productImport]: PERMISSIONS.PRODUCTS_CREATE,
   [ROUTES.customers]: PERMISSIONS.CUSTOMERS_VIEW,
   [ROUTES.debts]: PERMISSIONS.DEBTS_VIEW,

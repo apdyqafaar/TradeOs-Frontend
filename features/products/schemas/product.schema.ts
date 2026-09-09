@@ -179,10 +179,16 @@ export const createProductSchema = z.strictObject({
  * below WITHOUT their defaults, so what leaves this browser is only what the
  * user actually changed.
  *
- * That does not fix the API — it re-parses the body and re-applies its own
- * defaults, so **every PATCH must send `unit` and `trackStock` explicitly**,
- * carrying the product's current values, or the server resets the unit to
- * "pcs" and turns stock tracking on. See `docs/findings/s2-task-01.md`.
+ * **The backend has since been fixed** (`Backend` commit `cb46775`): the
+ * defaults were moved out of the shape `updateProductSchema` builds from, the
+ * same correction already applied to `announcement.validation.ts` and
+ * `project.validation.ts`, with unit tests that assert on the KEYS a partial
+ * body parses to. So the earlier instruction to resend `unit` and
+ * `trackStock` on every PATCH no longer applies and must not come back.
+ *
+ * The divergence below stays anyway: declaring them without defaults is what
+ * makes a partial update actually partial on this side of the wire, which is
+ * correct on its own merits and not a workaround for anything.
  */
 export const updateProductSchema = createProductSchema
   .omit({ quantity: true })

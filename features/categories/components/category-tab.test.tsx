@@ -50,15 +50,29 @@ beforeEach(() => {
 
 describe("CategoryTab", () => {
   it("marks the default category protected and offers no delete for it", () => {
-    // `isDefault` is the wire field, not `key: "general"`. General is the
-    // fallback for every product created without a category, so deleting it
-    // is refused by the API with 409 CATEGORY_PROTECTED.
+    // The fixture is the trap, deliberately: Electronics is `isDefault: true`
+    // too, because the API sets that on all four seeded categories. Only
+    // General carries `key: "general"`, and that is the single one DELETE
+    // refuses with 409 CATEGORY_PROTECTED. A regression to gating on
+    // `isDefault` turns this red — two Protected badges and no delete button.
     categories.mockReturnValue({
       isPending: false,
       error: null,
       data: [
-        { id: "c1", name: "General", isDefault: true, productCount: 12 },
-        { id: "c2", name: "Electronics", isDefault: false, productCount: 3 },
+        {
+          id: "c1",
+          name: "General",
+          isDefault: true,
+          key: "general",
+          productCount: 12,
+        },
+        {
+          id: "c2",
+          name: "Electronics",
+          isDefault: true,
+          key: null,
+          productCount: 3,
+        },
       ],
     });
 
@@ -73,7 +87,13 @@ describe("CategoryTab", () => {
       isPending: false,
       error: null,
       data: [
-        { id: "c2", name: "Electronics", isDefault: false, productCount: 3 },
+        {
+          id: "c2",
+          name: "Electronics",
+          isDefault: true,
+          key: null,
+          productCount: 3,
+        },
       ],
     });
 
@@ -89,8 +109,20 @@ describe("CategoryTab", () => {
       isPending: false,
       error: null,
       data: [
-        { id: "c1", name: "General", isDefault: true, productCount: 12 },
-        { id: "c2", name: "Electronics", isDefault: false, productCount: 3 },
+        {
+          id: "c1",
+          name: "General",
+          isDefault: true,
+          key: "general",
+          productCount: 12,
+        },
+        {
+          id: "c2",
+          name: "Electronics",
+          isDefault: true,
+          key: null,
+          productCount: 3,
+        },
       ],
     });
     deleteMutation.mockReturnValue({
@@ -171,7 +203,13 @@ describe("CategoryTab", () => {
       isPending: false,
       error: null,
       data: [
-        { id: "c2", name: "Electronics", isDefault: false, productCount: 3 },
+        {
+          id: "c2",
+          name: "Electronics",
+          isDefault: true,
+          key: null,
+          productCount: 3,
+        },
       ],
     });
     updateMutation.mockReturnValue({

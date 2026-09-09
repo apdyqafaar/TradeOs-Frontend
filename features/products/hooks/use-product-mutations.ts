@@ -56,10 +56,14 @@ export function useCreateProduct(): UseMutationResult<
  * `PATCH /products/:id`. The id travels in the variables rather than as a hook
  * argument, so one instance serves a form, a row action and a bulk loop.
  *
- * **Send `unit` and `trackStock` on every call.** The API re-applies its own
- * defaults to whatever arrives, so a body that omits them resets the unit to
- * `"pcs"` and turns stock tracking on — including on the `{ status: "active" }`
- * un-archive. `docs/findings/s2-task-01.md` has the evidence.
+ * Send only what changed. This once had to carry `unit` and `trackStock` on
+ * every call, because `updateProductSchema` was built as
+ * `createProductSchema.partial()` and zod re-applied their `.default()`s to
+ * keys the caller never sent — so a rename reset a `kg` product to `pcs` and
+ * an un-archive switched stock tracking on for a service. That was a backend
+ * defect, found here and fixed there (`Backend` commit `cb46775`, with unit
+ * tests that assert on the keys a partial body parses to). The workaround is
+ * gone; do not reintroduce it. `docs/findings/s2-task-01.md` has the history.
  */
 export interface UpdateProductVariables {
   id: ObjectId;

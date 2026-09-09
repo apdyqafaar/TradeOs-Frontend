@@ -140,10 +140,11 @@ function CategoryRow({
           <span className="flex-none font-mono text-[11px] text-muted-foreground">
             {countLabel(category.productCount)}
           </span>
-          {/* The canvas's lock. `isDefault` is what the wire offers; it is not
-              exactly what the API protects, which is why the badge says
-              "Protected" rather than naming a rule the client cannot verify. */}
-          {category.isDefault ? (
+          {/* The canvas's lock. Gated on `key`, not `isDefault`: the latter
+              is true for all four seeded categories and would mark every one
+              of them protected. `key === "general"` is the single category
+              DELETE actually refuses. */}
+          {category.key === "general" ? (
             <Badge
               variant="secondary"
               className="h-[22px] flex-none rounded-lg bg-muted px-2 font-medium text-[11px] text-muted-foreground"
@@ -162,9 +163,9 @@ function CategoryRow({
               <Pencil aria-hidden="true" />
             </Button>
           ) : null}
-          {/* No delete for a default category, and no disabled one either: a
-              control the API will refuse is not shown at all (CLAUDE.md). */}
-          {canDelete && !category.isDefault ? (
+          {/* No delete for the protected category, and no disabled one either:
+              a control the API will refuse is not shown at all (CLAUDE.md). */}
+          {canDelete && category.key !== "general" ? (
             <Button
               type="button"
               size="icon-sm"
