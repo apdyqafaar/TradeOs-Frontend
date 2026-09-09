@@ -163,13 +163,67 @@ link. Making either guest-only breaks a supported flow.
 - **`useOrganization()` costs a request the dashboard has already answered.** `GET /dashboard`
   returns `organization.timezone` and `organization.currency`, so the Overview fetches the currency
   config a second time. Reading it from the dashboard payload on that page would remove a request.
-- **No end-to-end browser test exists.** Everything is verified by unit test, typecheck, source
-  reading, and a live API round trip via `curl`. Nothing has driven a real authenticated browser
-  session — the Overview has never been *seen* with real data. Playwright would close this and is
-  the obvious next investment.
+- **No *automated* end-to-end browser test exists.** A manual pass has now been driven through a
+  real Chrome session against a real backend (see §6), so the claim that nothing had ever been seen
+  in a browser is retired. What is still missing is a test that *re-runs*: today the pass is a
+  person driving a browser, so it proves the screens at one moment and guards nothing afterwards.
+  Playwright remains the obvious investment.
 - **A 429 shows twice** — the axios interceptor toasts centrally and the auth forms also banner it.
   One cross-form cleanup.
 - **The `⌘K` search trigger is rendered and wired to nothing.**
 - **Passkey login renders disabled.** The backend supports it; the WebAuthn ceremony is unbuilt.
 - **`SheetOverlay` hardcodes `bg-black/10`** where the canvas wants ~45%; it is inside vendored
   `components/ui/sheet.tsx`.
+
+---
+
+## 6. The visual pass — what a real browser actually showed
+
+**Run 2026-09-09** against `localhost:3000` proxying a live backend on `8001`, in Chrome, signed in
+as a seeded business (`Bakaara Traders`, main **KES**, exchange **USD** at 130, `Africa/Nairobi`)
+holding ten products across every stock state and five customers. Both themes. Slice 2's screens
+had never been opened in a browser before this; every prior claim about them rested on unit tests,
+typechecks and source reading.
+
+### Confirmed working, against a real server
+
+- **The category-protection fix (`Backend a70ebef`) is correct end to end.** All four seeded
+  categories carry `isDefault: true`; only **General** rendered the *Protected* badge and only
+  General lacked a delete control. The other three — Electronics, Food & Drinks, Household — each
+  kept theirs. This is the exact screen the bug would have ruined: gating on `isDefault` shows four
+  Protected badges and offers a delete on none. Product counts also reconciled (3 + 5 + 0 + 2 = 10).
+- **Money renders as a code, never a symbol**, two decimals, right-aligned mono — `KES 1,450.00`
+  throughout, on a business whose books are in shillings. Quantities kept three decimals and trimmed
+  trailing zeros (`2.5 kg`, `63 bag`).
+- **The restock dialog's live preview is arithmetically right**: 63 bag + 12.5 → `75.5 bag`,
+  including the fractional quantity.
+- **Stock movements read correctly.** `quantityAfter` is a **server-provided field per movement**
+  (`id, productId, type, quantity, quantityAfter, reason, createdBy, createdAt`) — it is not
+  derived client-side, so pagination cannot desynchronise it.
+- **Dark mode holds up** across list, detail and dialog. `color-scheme: dark` is set on the root, so
+  even the native `<select>` popups render dark rather than flashing white.
+- **Timezone is the business's, not the browser's**: movements recorded at 15:17 UTC displayed as
+  `09 Sep 2026 18:19` — East Africa Time.
+
+### Deviations from the canvas, both cosmetic
+
+- **The `<select>` arrow is the OS glyph**, where artboard `2c` draws a lucide chevron. The controls
+  are otherwise fully themed — 10px radius, Geist, 38px tall, correct token border — so this is the
+  arrow alone, not an unstyled control.
+- **The product thumbnail placeholder is a flat panel reading "No photo"**, where artboards `2a`
+  and `2c` draw a 135° diagonal hatch with a small mono caption.
+
+### What the pass could not establish
+
+- **It ran at a 1513px CSS viewport, not 1440.** The Chrome window was maximized and refused
+  programmatic resize, and the display runs at DPR 1.25. Both widths sit in the same breakpoint
+  band, so layout structure is comparable and column proportions are not.
+- **It is a moment, not a guard.** Nothing here re-runs; see the Playwright note in §5.
+
+### Method note, for whoever repeats this
+
+Signing in was done **without typing a password**: the session was established over the API with
+`curl`, and the resulting `tradeos_session` cookie was set on the origin from the console. The
+backend logs verification emails rather than sending them when SMTP is unconfigured
+(`Backend/src/lib/mailer.ts`), so the seeded account's address was marked verified directly in
+MongoDB — `POST /organizations` requires a verified email and would otherwise be unreachable.
