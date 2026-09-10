@@ -15,16 +15,24 @@ debt creation; the product import wizard (`2e`); reports (`2i`); members and rol
 settings and account (`2k`); projects and the public client page (`2l`); announcements and the
 Help Center (`2m`).
 
-Verified 2026-09-10: **993 tests / 108 files**, tsc and biome clean. Slices 2 and 3 were driven in
-a real authenticated browser against a live backend — a credit sale rung up end to end at the
-counter (stock moved, receipt rendered, debt opened and appeared named in the list), the
-overpayment refusal confirmed to record nothing server-side, and the import wizard run against the
-owner's 25-row fixture.
+Verified 2026-09-10: **1000 tests / 109 files**, tsc and biome clean.
 
-**What is not done is a pass over the whole thing**: the six slices were built in parallel by
-separate agents against the same contracts, so the seams between them are the least-tested part of
-the product. `docs/FINDINGS.md` §1 lists the decisions still open for the owner, and several
-backend questions are recorded there awaiting a ruling rather than a fix.
+**A whole-product pass was driven in a real authenticated browser** on 2026-09-10 against a live
+backend, after the last slice landed — every top-level screen, in both light and dark. What it
+confirmed: the reports arithmetic reconciles end to end across three screens (revenue − COGS =
+gross profit, margin, average sale, collected + credit = revenue); `marginPct` renders as 27.6%
+rather than 0.276; a shop keeping books in ETB while taking USD and KES labels every tendered
+figure in ETB; the zero-filled payment statuses appear as "0 sales · ETB 0.00" against real data;
+the 366-day refusal fires client-side and says what it is showing instead; and member names now
+resolve in all four places that used to print an em dash. Earlier passes drove a credit sale end
+to end at the counter and ran the import wizard against the owner's 25-row fixture.
+
+**It also found a real bug that 998 tests had no opinion about** — 24 links styled as buttons were
+announced and keyed as buttons. See §2 of `docs/FINDINGS.md`. That is the argument for doing this
+in a browser rather than trusting a green suite.
+
+`docs/FINDINGS.md` §1 lists the decisions still open for the owner, and several backend questions
+are recorded there and in `../Backend/docs/FINDINGS.md` §1 awaiting a ruling rather than a fix.
 
 **Server-side page protection landed 2026-09-09** after the owner found that a forged cookie
 reached the app shell. Confirmed live: `/overview` with a forged cookie answers 307 to `/login`
