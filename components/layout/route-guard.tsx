@@ -27,6 +27,14 @@ import { resolveRoutePermission } from "@/lib/auth/route-permissions";
  *
  * This is a UX layer, not a security boundary. The API's 403 is the
  * enforcement; this exists so nobody reaches a screen that can only fail.
+ *
+ * **Not made redundant by the server check, and not to be deleted as a
+ * duplicate.** `app/(app)/layout.tsx` now runs the same resolution on the
+ * server and refuses the page before it renders — but a layout runs for the
+ * request that *entered* the segment, and every navigation after that is a
+ * client transition it does not see. Someone who lands on `/overview` and then
+ * clicks through to a page they lack the permission for is caught here and
+ * nowhere else. Same rule, two moments: server-first, client-continuous.
  */
 export function RouteGuard({ children }: { children: ReactNode }): ReactNode {
   const pathname = usePathname();

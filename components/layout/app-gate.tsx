@@ -54,6 +54,16 @@ function Preparing() {
  * This is a UX layer, not a security boundary. `requireMember` and
  * `requirePermission` on the API are the enforcement; this stops people
  * reaching screens that can only fail.
+ *
+ * **Not made redundant by the server check, and not to be deleted as a
+ * duplicate.** `app/(app)/layout.tsx` now validates the session against
+ * `GET /auth/me` before any of this renders, which is what actually protects
+ * the page. It answers once, for the request that entered the segment. This
+ * answers continuously: a session that expires while someone is sitting on a
+ * page, or is revoked from another device, is caught by the query underneath
+ * this component and nowhere else — the layout has long since finished. The
+ * server seeds this query's cache with the session it already fetched, so the
+ * pair costs one `/auth/me`, not two.
  */
 export function AppGate({ children }: { children: ReactNode }): ReactNode {
   const { data, isPending } = useSession();

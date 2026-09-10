@@ -1,10 +1,13 @@
 "use client";
 
-import { HandCoins } from "lucide-react";
+import { HandCoins, Plus } from "lucide-react";
+import Link from "next/link";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorCard } from "@/components/shared/error-card";
 import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
 import { Button } from "@/components/ui/button";
+import { ROUTES } from "@/config/routes";
+import { useCan } from "@/features/auth/hooks/use-permission";
 import {
   DEBT_STATUS_LABELS,
   DebtStatusTabs,
@@ -16,6 +19,7 @@ import { DebtTable } from "@/features/debts/components/debt-table";
 import { useDebts } from "@/features/debts/hooks/use-debts";
 import type { DebtStatusFilter } from "@/features/debts/types";
 import { useOrganization } from "@/features/organization/hooks/use-organization";
+import { PERMISSIONS } from "@/lib/auth/permissions";
 
 /** The one panel the six tabs control, so they can point `aria-controls` at it. */
 const PANEL_ID = "debt-list-panel";
@@ -67,6 +71,7 @@ function countLabel(total: number, status: DebtStatusFilter): string {
  */
 export function DebtsPage() {
   const [filters, setFilters] = useDebtFilters();
+  const canCreate = useCan(PERMISSIONS.DEBTS_CREATE);
 
   /*
    * Both facts are needed by the table: `currency` for the three money columns
@@ -127,6 +132,19 @@ export function DebtsPage() {
           : "Nothing is owed to this business right now. A debt raised at the counter or by hand shows up here."
       }
       icon={HandCoins}
+      // The panel this codebase left actionless while there was no create
+      // screen — noted as an anomaly in `docs/findings/slice3-debts-data.md`,
+      // because every other empty state offers the create control to whoever
+      // holds the permission. An empty debt book is the one place somebody is
+      // most likely to want this.
+      action={
+        canCreate ? (
+          <Button render={<Link href={ROUTES.debtNew} />}>
+            <Plus className="size-4" aria-hidden="true" />
+            New debt
+          </Button>
+        ) : undefined
+      }
     />
   );
 
@@ -145,18 +163,29 @@ export function DebtsPage() {
         </div>
 
         {/*
-          No "New debt" button, here or on the empty state.
+          The artboard's action, now that `app/(app)/debts/new/page.tsx` exists
+          and `config/routes.ts` carries the row that gates it.
 
-          The artboard draws one, `POST /debts` exists behind `debts:create`,
-          and `useCreateDebt` is already written — but there is no create screen
-          to send anyone to. `config/routes.ts` has no `/debts/new` row and
-          `app/(app)/debts/new/page.tsx` does not exist, so the button would be
-          a 404 dressed as an affordance — the call `debt-detail.tsx` already
-          makes about the sale link it cannot follow.
+          **Hidden, never disabled** (brief §1.1): a member without
+          `debts:create` — the Seller preset, which holds `debts:view` and
+          `payments:create` but not this — does not learn that hand-entering a
+          debt is a thing this product does. `useCan` rather than
+          `<PermissionGate>` because that component renders nothing while the
+          session loads, which would pop the button in after the heading has
+          settled.
 
-          TODO(slice: 3): add the action — gated on `debts:create` and *hidden*
-          rather than disabled, per brief §1.1 — once a create screen lands.
+          `ROUTE_PERMISSIONS` gates `/debts/new` on the same permission, so a
+          typed URL meets `RouteGuard` rather than a form that can only 403.
         */}
+        {canCreate ? (
+          <Button
+            className="h-10 rounded-[10px] px-4 text-[13px]"
+            render={<Link href={ROUTES.debtNew} />}
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            New debt
+          </Button>
+        ) : null}
       </header>
 
       <DebtStatusTabs

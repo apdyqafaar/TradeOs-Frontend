@@ -595,3 +595,128 @@ protecting the "changing the filter resets the page" rule while protecting nothi
 - `bunx biome check .` — clean, 273 files. `features/sales/components/counter/` was in flight from
   another agent while this ran and had no errors at the time of the run; nothing under it was
   touched.
+
+---
+
+# Building the manual-debt create screen (`/debts/new`) — 2026-09-09
+
+The owner's report: *"we cannot create a new debt for manual, we need it."* `POST /debts`,
+`useCreateDebt` and `createDebtSchema` all existed; only the screen was missing. Added
+`app/(app)/debts/new/page.tsx` and `features/debts/components/debt-form.tsx`, wired the button the
+`TODO(slice: 3)` in `debts-page.tsx` marked, and added the two `config/routes.ts` rows.
+
+## The due date needed a *fourth* guard the schema comment does not mention
+
+`dueDateFromCalendarDate` was imported, never re-derived — it already solves the three traps its own
+doc-comment names (a bare `YYYY-MM-DD` is a 422; midnight UTC is yesterday west of Greenwich; and
+`TZDate.toISOString()` emits an offset Zod refuses). What building a *form* around it surfaced is
+that **the helper throws a `RangeError` on anything that is not `YYYY-MM-DD`, and `""` is one of
+those things.** An empty date box is the ordinary state of a form somebody has not finished, so
+calling it unguarded turns "you forgot a field" into an exception thrown out of a submit handler.
+
+`<input type="date">` also degrades to a plain text box in a browser without date support, where the
+field can genuinely hold "next Friday". So `debt-form.tsx` tests the string against a
+`CALENDAR_DATE` regex *before* converting, and only then hands the result to the schema. Two
+branches either side of it, because `""` and garbage are different sentences to a person.
+
+The rest of the timezone handling is the counter's, deliberately: `today` is
+`format(new Date(), "yyyy-MM-dd", { in: tz(timezone) })` from `useOrganization().timezone`, used
+both as the input's `min` and as a string comparison in `submit`. Neither is the authority — the
+server compares against its own `startOfDayIn(organization.timezone, now)` and answers a field error
+on `dueDate`, which routes onto the box unaided.
+
+**The submit is held while `useOrganization().isLoading`.** Its fallbacks are `"UTC"` and `""`, and
+both are wrong in a way that writes rather than merely displays: a `dueDate` built in UTC for a shop
+in New York can name a different day than the one picked, and an amount labelled `""` is a figure
+with no unit on a screen about money.
+
+## `principal` is now a compile error, not a code-review catch
+
+The single most expensive mistake available on this endpoint is sending `principal` — it is
+server-set to `round2(amount)` and the body is `.strict()`, so it is a 422 rather than a hint.
+Rather than trusting a comment, the form's field-routing map carries
+
+```ts
+} as const satisfies Record<keyof CreateDebtInput, keyof Issues>;
+```
+
+which fails to compile if the wire shape ever gains, loses or renames a key that this form does not
+route. It is the cheapest possible pin on the one thing `debt.schema.ts` warns hardest about.
+
+## A 404 from `POST /debts` cannot be pinned on the customer
+
+`createManualDebt` raises `NOT_FOUND` for a missing customer (`debt.service.ts:47`) **and** for a
+missing organization (`:53`), with the same code, the same status and nothing in the payload to tell
+them apart. So the 404 goes to the form's inline panel carrying the API's own sentence — which
+already names which — rather than being asserted onto the customer picker. The same call
+`counter.tsx`'s `serverIssues` makes, for the same reason.
+
+`CUSTOMER_ARCHIVED` (409) *is* pinned to the picker, and it is reachable only as a race: the picker
+searches `status: "active"`, so the customer must have been archived between the search and the
+submit. The copy stops at "pick someone else" — **there is no unarchive endpoint in this phase**
+(`DELETE /customers/:id` is what archives one), so offering to restore them would be inventing an
+affordance.
+
+## No currency control, and therefore one sentence no other screen needs
+
+A `Debt` has no `currency` field at all (`debt.model.ts:16-35`), so every figure on it is implicitly
+the organization's main currency. That rules out the `CurrencyToggle` a payment gets — offering a
+choice the record cannot hold would be a lie — and it also removes the thing that makes `MoneyInput`
+legible elsewhere. `MoneyInput` prints the code **only to screen readers** (`sr-only`, "Amount in
+KES"), because on artboards `2a` and `2g` a currency toggle sits directly above it saying which.
+This screen has no toggle, so the sentence had to be written: "Recorded in KES, this business's main
+currency. A debt has no currency of its own." Code, never symbol, read off `useOrganization()`.
+
+## react-hook-form was the wrong tool here, unlike on `product-form.tsx`
+
+Two of three controls — `MoneyInput` (a `number | null`) and `CustomerPicker` (a whole `Customer`) —
+are controlled components that cannot be `register`ed. A resolver would have ended up validating two
+`setValue`-shadowed fields, which is the form library doing none of its job at twice the
+indirection. So this follows `record-payment-dialog.tsx`: `useState` per field, one
+`createDebtSchema.safeParse` of the assembled payload, and an `Issues` object routed to controls.
+
+One departure from that dialog: it clears **all** issues on any change, which is affordable with one
+field and hides two unfixed messages the moment you touch a third. `clear(slot)` drops one.
+
+## Wiring the button falsified an existing test, and forced a mock into another
+
+`debts-page.test.tsx`'s "offers no 'New debt' action while there is no create screen to open"
+asserted the absence of exactly the thing the owner asked for. It is now "links the 'New debt'
+action at the create screen that now exists", plus a hide-don't-disable case and an empty-state
+case, with the original reasoning kept in the comment so the reversal is legible.
+
+The nine *other* tests in that file broke for a mechanical reason worth recording: **`useCan` reads
+the session through React Query**, so the moment `DebtsPage` gates anything, the component needs a
+`QueryClientProvider` that the file never had. Mocking `@/features/auth/hooks/use-permission` was
+the smaller change than wrapping ten renders in a provider whose only job is to answer a question
+the tests state outright. No code-side fix exists — hide-don't-disable requires reading permissions.
+
+The empty state gained the action too. The section above ("No 'New debt' button, because there is no
+create screen") had flagged the actionless "No open debts" panel as an anomaly in this codebase; an
+empty debt book is the likeliest place somebody wants this button.
+
+## `/debts/new` beats `/debts/[id]`, and both matchers agree
+
+Next resolves a static segment before a dynamic sibling, so `/debts/new` renders the new page rather
+than `DebtDetail` asking the API for a debt whose id is the word "new". `resolveRoutePermission`
+reaches the same conclusion by a different rule — longest guarded prefix on a `/` boundary — so the
+route table and the router cannot disagree about which page this is.
+
+The `ROUTE_PERMISSIONS` row is stricter than its `/debts` parent for the `productNew` reason,
+verified rather than assumed: `PRESET_SELLER` in `lib/auth/permissions.ts` holds `debts:view` and
+`payments:create` but **not** `debts:create`, so a seller browsing the debt book would otherwise
+reach a form whose every submit is a 403.
+
+## Verification
+
+- `bunx tsc --noEmit` — clean (exit 0).
+- `bunx biome check .` — clean, 279 files.
+- `bunx vitest run features/debts` — 93 tests, 10 files, green (85 existing + 8 new).
+- `bunx vitest run` (full suite) — 500 tests, 59 files, green.
+- One earlier full run showed 10 failures in `app/(app)/layout.test.tsx`; that file and
+  `lib/auth/server-session.ts` were being written by the server-side-auth agent *during* the run,
+  and the latter still carried a `BREAK-TEST ONLY` early return. Both were green on the next run and
+  nothing in them touches debts. `config/routes.ts` was shared with that agent and the diff there is
+  exactly the two additions this task called for — no collision.
+- Not driven in a real browser: the API was not running, so nothing here has seen a live 201, a live
+  `CUSTOMER_ARCHIVED`, or the server's own `dueDate` 422.

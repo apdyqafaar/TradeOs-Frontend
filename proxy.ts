@@ -1,16 +1,24 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { serverEnv } from "@/config/env";
+import { REQUEST_PATH_HEADER } from "@/lib/auth/request-path-header";
 
 /**
- * An optimistic cookie-presence gate, and nothing more.
+ * An optimistic cookie-presence gate, plus one piece of plumbing.
  *
  * The Next docs are explicit that Proxy "should not be used as a full session
- * management or authorization solution". So this never fetches, never decodes
- * the token and never trusts it: a forged cookie buys a redirect into the app
- * shell and an immediate 401 from the API, which the query layer turns back
- * into a trip to /login. What it does buy is that the common signed-out case
- * never renders the shell, and the signed-in case never sees the login form.
+ * management or authorization solution". So this still never fetches, never
+ * decodes the token and never trusts it. **The check that does trust nothing
+ * now lives one layer up**: `app/(app)/layout.tsx` awaits `GET /auth/me`
+ * before it renders anything, so a forged cookie gets past this gate and is
+ * refused there — on the server, before any of the shell exists. What this
+ * buys is cheapness: the common signed-out case is turned away without a fetch
+ * at all, and the signed-in case never sees the login form.
+ *
+ * The plumbing is `REQUEST_PATH_HEADER`, set on the way through. A Server
+ * Component has no way to read the pathname and the layout needs it, both to
+ * resolve the route's permission and to build its own `next=`. See the comment
+ * on the `NextResponse.next()` at the bottom of `proxy()`.
  *
  * **It is a deny-list, not an allow-list, and there is no third list.** A path
  * named in neither array below falls through to `NextResponse.next()` in both
@@ -94,7 +102,27 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/overview", request.url));
   }
 
-  return NextResponse.next();
+  // Two jobs on the way through, not one.
+  //
+  // The path rides upstream on a request header because a Server Component has
+  // no way to read the pathname: `app/(app)/layout.tsx` needs it to resolve
+  // this route's entry in `ROUTE_PERMISSIONS` and to build the `next=` on its
+  // own /login redirect. `NextResponse.next({ request: { headers } })` is the
+  // documented shape — `NextResponse.next({ headers })` sends them to the
+  // *client* instead, which is a different thing entirely
+  // (`node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md`,
+  // "Setting Headers").
+  //
+  // It is `set` on a copy of the incoming headers, unconditionally and on
+  // every matched request: a caller may send this header, but their value
+  // never survives, so the layout cannot be lied to about which page it is
+  // being asked to gate. `REQUEST_PATH_HEADER` is imported from a module that
+  // holds nothing but the string, because anything richer — `config/routes.ts`
+  // and its lucide icons above all — would land in this bundle.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set(REQUEST_PATH_HEADER, `${pathname}${search}`);
+
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 export const config = {

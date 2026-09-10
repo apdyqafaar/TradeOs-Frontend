@@ -19,6 +19,7 @@ import {
 } from "@/features/auth/schemas/auth.schema";
 import type { ApiError } from "@/lib/api/errors";
 import { API_ERROR_CODE, fieldErrorsFor } from "@/lib/api/errors";
+import { isSafeInternalPath } from "@/lib/auth/safe-path";
 
 /** The two fields the form owns; anything else in a 422 goes to the banner. */
 const FIELDS = ["email", "password"] as const;
@@ -78,7 +79,16 @@ export function LoginForm() {
       return;
     }
     // `next` is where the proxy sent them from; the overview is the default.
-    router.push(searchParams.get("next") ?? ROUTES.overview);
+    //
+    // Validated, not trusted. The honest value is minted by `proxy.ts` or by
+    // the app layout, but the parameter sits in a URL anyone can compose and
+    // send: `/login?next=//evil.example` is protocol-relative, so pushing it
+    // unchecked walks the user off this origin immediately after they typed
+    // their password on a page they reached from this product's own domain.
+    // `isSafeInternalPath` is the same predicate the server-side gate applies
+    // to the header it reads, so both ends agree on what "internal" means.
+    const next = searchParams.get("next");
+    router.push(next && isSafeInternalPath(next) ? next : ROUTES.overview);
   };
 
   const onError = (error: ApiError) => {

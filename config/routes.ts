@@ -45,6 +45,7 @@ export const ROUTES = {
   customers: "/customers",
   customer: (id: string) => `/customers/${id}`,
   debts: "/debts",
+  debtNew: "/debts/new",
   debt: (id: string) => `/debts/${id}`,
   reports: "/reports",
   reportsSales: "/reports/sales",
@@ -197,6 +198,11 @@ export const ROUTE_PERMISSIONS: Readonly<Record<string, Permission>> = {
   [ROUTES.productImport]: PERMISSIONS.PRODUCTS_CREATE,
   [ROUTES.customers]: PERMISSIONS.CUSTOMERS_VIEW,
   [ROUTES.debts]: PERMISSIONS.DEBTS_VIEW,
+  // Stricter than its `/debts` parent, and it needs to be: the Seller preset
+  // holds `debts:view` and `payments:create` but NOT `debts:create`
+  // (`PRESET_SELLER` in `lib/auth/permissions.ts`), so a seller reading the
+  // debt book would otherwise reach a form whose every submit is a 403.
+  [ROUTES.debtNew]: PERMISSIONS.DEBTS_CREATE,
   [ROUTES.reports]: PERMISSIONS.REPORTS_VIEW,
   [ROUTES.projects]: PERMISSIONS.PROJECTS_VIEW,
   [ROUTES.team]: PERMISSIONS.MEMBERS_INVITE,

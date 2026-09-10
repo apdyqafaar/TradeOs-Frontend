@@ -21,6 +21,17 @@ vi.mock("@/features/organization/hooks/use-organization", () => ({
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
+/**
+ * `useCan` reads the session through React Query, so left real it would need a
+ * `QueryClientProvider` around every render in this file — a provider whose
+ * only job would be to answer a permission question the tests already state
+ * outright. Mocked, `can` is the answer, and the two tests that care set it.
+ */
+const can = vi.fn(() => true);
+vi.mock("@/features/auth/hooks/use-permission", () => ({
+  useCan: () => can(),
+}));
+
 const debt = (overrides: Partial<Debt> = {}): Debt => ({
   id: "d1",
   customerId: "cu1",
@@ -61,6 +72,7 @@ const renderPage = (search = "") =>
 beforeEach(() => {
   debtsQuery.mockReset();
   debtsQuery.mockReturnValue(answered([debt()]));
+  can.mockReturnValue(true);
 });
 
 describe("DebtsPage", () => {
@@ -113,13 +125,39 @@ describe("DebtsPage", () => {
     expect(screen.queryByPlaceholderText(/search/i)).toBeNull();
   });
 
-  it("offers no 'New debt' action while there is no create screen to open", () => {
-    // `POST /debts` exists behind `debts:create` and the artboard draws the
-    // button, but `app/(app)/debts/new/page.tsx` does not exist — a link to a
-    // route with no page is a 404 dressed as an affordance.
+  it("links the 'New debt' action at the create screen that now exists", () => {
+    // This test used to assert the button's *absence*: `POST /debts` existed
+    // behind `debts:create` and the artboard drew the action, but there was no
+    // `/debts/new` page to send anyone to, and a link to a route with no page
+    // is a 404 dressed as an affordance. The page and its `ROUTE_PERMISSIONS`
+    // row both exist now, so the assertion is the other way round.
+    renderPage();
+
+    expect(screen.getByRole("link", { name: /new debt/i })).toHaveAttribute(
+      "href",
+      "/debts/new",
+    );
+  });
+
+  it("hides 'New debt' from a role without debts:create, never disables it", () => {
+    // Brief §1.1: a member without the permission sees nothing, not a greyed
+    // control. The Seller preset is exactly this case — it holds `debts:view`
+    // and `payments:create` but not `debts:create`. Asserted over the empty
+    // book, so both places the action appears are covered at once.
+    can.mockReturnValue(false);
+    debtsQuery.mockReturnValue(answered([], 0));
     renderPage();
 
     expect(screen.queryByText(/new debt/i)).toBeNull();
+  });
+
+  it("offers the create action on an empty debt book too", () => {
+    // The one empty state in this app that had no action at all while there
+    // was no create screen — and the place somebody is most likely to want one.
+    debtsQuery.mockReturnValue(answered([], 0));
+    renderPage();
+
+    expect(screen.getAllByRole("link", { name: /new debt/i })).toHaveLength(2);
   });
 
   it("gives a way back to the open list when a tab comes back empty", () => {
