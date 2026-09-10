@@ -170,6 +170,35 @@ All verified against backend source and then against a live server:
 
 ## 3. Security and risk
 
+### The public project page: three things that outlive an unpublish
+**Found 2026-09-10 while extracting the projects contract. Backend, not frontend.**
+`GET /public/projects/:token` is the only unauthenticated business route, and its payload is
+tight — ids, customer, author and publish state are all dropped, and the key sets are asserted at
+all three levels by `public-link.test.ts`. Three things still leak, in rising order of concern:
+
+1. **`updatedAt` is exposed**, so an anonymous visitor can see when the project was last edited
+   internally. Minor, but it is timing information about private activity.
+2. **`cover.url` and `business.logo` embed the organizationId in plaintext**, and the bucket is
+   public-read with no signed URLs. So those images keep resolving **after the project is
+   unpublished** — the page goes away, the pictures do not.
+3. **The public lookup never checks organization status.** A suspended organization's published
+   project stays reachable. Suspension is presumably meant to stop a business being served; here it
+   does not stop the one route that serves it to strangers.
+
+Also worth knowing, and not a leak but an oracle: a token longer than 128 characters returns
+**422**, not 404, so the route is not perfectly opaque about what a well-formed token looks like.
+
+None of these is fixable from the frontend. Recorded here rather than worked around.
+
+### The share token is shown once and cannot be recovered
+**Found 2026-09-10. Product consequence, not a bug.** The token is 32 random bytes, stored only as
+a SHA-256 hash, and returned exactly once — by the `publish` that mints it. `publish` on an
+already-hashed project reuses the hash and answers `shareToken: null`, and no read endpoint ever
+returns it. So a client that does not keep the value from that one response has lost the link, and
+the only recovery is `regenerate-link`, which **kills every link already shared with a client**.
+The UI must therefore treat the publish response as the single moment the link exists, and say so.
+
+
 ### `RouteGuard` is preset-shaped, not catalog-shaped
 `/overview`, `/announcements`, `/help` and `/account` are ungated because all three preset roles
 hold the permissions behind them. **Roles are editable**, so a hand-built custom role without
