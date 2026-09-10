@@ -9,17 +9,22 @@ Guidance for Claude Code working in the TradeOs frontend. The design specificati
 
 ## Where things stand (2026-09-10)
 
-**Slices 1–3 are complete.** Auth, the shell and the Overview; products, categories, stock and
-customers; and the counter, the receipt with its void flow, the debts list, debt detail with
-payments and write-off, and manual debt creation.
+**Every artboard on the design canvas is built.** Auth, the shell and the Overview; products,
+categories, stock and customers; the counter, the receipt with its void flow, debts and manual
+debt creation; the product import wizard (`2e`); reports (`2i`); members and roles (`2j`);
+settings and account (`2k`); projects and the public client page (`2l`); announcements and the
+Help Center (`2m`).
 
-**Not built:** the import wizard (`2e`), reports (`2i`), members and roles (`2j`), settings and
-account (`2k`), projects (`2l`), announcements and Help Center (`2m`).
+Verified 2026-09-10: **993 tests / 108 files**, tsc and biome clean. Slices 2 and 3 were driven in
+a real authenticated browser against a live backend — a credit sale rung up end to end at the
+counter (stock moved, receipt rendered, debt opened and appeared named in the list), the
+overpayment refusal confirmed to record nothing server-side, and the import wizard run against the
+owner's 25-row fixture.
 
-Verified 2026-09-10: 504 tests / 59 files, tsc and biome clean. Slices 2 and 3 were driven in a
-real authenticated browser against a live backend — a credit sale rung up end to end at the
-counter (stock moved, receipt rendered, debt opened and appeared named in the list), and the
-category-protection fix confirmed on screen.
+**What is not done is a pass over the whole thing**: the six slices were built in parallel by
+separate agents against the same contracts, so the seams between them are the least-tested part of
+the product. `docs/FINDINGS.md` §1 lists the decisions still open for the owner, and several
+backend questions are recorded there awaiting a ruling rather than a fix.
 
 **Server-side page protection landed 2026-09-09** after the owner found that a forged cookie
 reached the app shell. Confirmed live: `/overview` with a forged cookie answers 307 to `/login`
@@ -122,12 +127,27 @@ still an **optimistic cookie-presence check only** — it never fetches and neve
 It exists to avoid a flash of the shell before a redirect, and it forwards the request path on
 `x-tradeos-path` for the layout below.
 
-**The real server-side gate is `app/(app)/layout.tsx`** (added 2026-09-09, after the owner pointed
-out that a forged cookie reached the shell). It is async: it reads the session cookie, calls
-`GET /auth/me` against the API origin with `cache: "no-store"`, and decides before anything
-renders — `/login?next=…` on no session, `/onboarding` on no organization, `ForbiddenScreen`
-inside the shell when the route's permission is missing. **An unreachable API fails closed.** See
-`lib/auth/server-session.ts` and `docs/findings/slice3-server-auth.md`.
+**The real server-side gate is `requirePageAccess()`, awaited by every page** — not the layout.
+It reads the session cookie, calls `GET /auth/me` against the API origin with `cache: "no-store"`,
+and decides before anything renders: `/login?next=…` on no session, `/onboarding` on no
+organization, and a `permitted: false` the page turns into `<ForbiddenScreen />` when the route's
+permission is missing. **An unreachable API fails closed.**
+
+**Every new page under `app/(app)/` must open with these two lines**, or it is not protected:
+
+```tsx
+const { permitted } = await requirePageAccess();
+if (!permitted) return <ForbiddenScreen />;
+```
+
+It started life in `app/(app)/layout.tsx` on 2026-09-09, after the owner pointed out that a forged
+cookie reached the shell, and moved into the pages the next day when the owner pushed back on
+exactly the right thing: **layouts do not re-render on client-side navigation.** Next's own
+glossary says the router serves a cached layout "without a server request", while pages are not
+cached by default — so a layout-only gate is checked on the first load and then never again for
+the rest of the session. `require-page-access.test.ts` walks `app/(app)/**/page.tsx` and fails
+naming any page that does not call it, which is the only thing keeping a new page from shipping
+open. See `lib/auth/require-page-access.ts` and `docs/findings/slice3-server-auth.md`.
 
 `next.config.ts` rewrites `/api/v1/*` to the Express origin so the browser calls the API
 same-origin. That keeps the session cookie first-party, removes CORS entirely, and is what lets
@@ -180,8 +200,10 @@ Vitest + happy-dom + Testing Library. Config is `vitest.config.mts` (**`.mts` de
   with off-white text, 3.0:1) and the active nav pill (#D97757 on #F6E7DF, 2.6:1) are below WCAG AA
   for small text. The owner chose to match the design canvas exactly. `app/globals.test.ts` locks
   both values — if it fails, someone is "fixing" the contrast. Ask before changing it.
-- **`typedRoutes` is off** in `next.config.ts` — it would type `Link href` to routes that exist, and
-  most paths in `config/routes.ts` have no page yet. Turn it on once the route tree is complete.
+- **`typedRoutes` is off** in `next.config.ts` — it would type `Link href` to routes that exist.
+  It was left off because most paths in `config/routes.ts` had no page yet; **as of 2026-09-10 they
+  all do**, so the condition for turning it on has been met. It is worth doing as its own change,
+  since the first build with it on is the one that finds every stale `href`.
 - **A dead network is not retried** (`ApiError` uses status 0, which the retry policy treats as
   final). If the mobile-heavy market makes offline blips common, exempt status 0 — it is one line.
 
@@ -196,7 +218,7 @@ Two entries there change how you work and are worth repeating here:
 - **The client permission layers are UX, not security** — still true, and still not a boundary.
   `proxy.ts` checks only that a cookie exists; `RouteGuard` and `PermissionGate` hide what the
   caller cannot use. What changed on 2026-09-09 is that they are no longer the *only* thing in
-  front of a page: `app/(app)/layout.tsx` validates the session server-side before rendering, and
+  front of a page: `requirePageAccess()` validates the session server-side on every page, and
   `login-form.tsx` no longer pushes an unvalidated `?next=` (that was an open redirect —
   `//evil.example` walked the user off-origin right after they typed their password). **The API is
   still the only thing protecting DATA**; the server gate protects pages.

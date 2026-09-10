@@ -93,6 +93,24 @@ export const API_ERROR_CODE = Object.freeze({
   // Organizations.
   SEED_MISSING: "SEED_MISSING",
 
+  // Periods — every `from`/`to` endpoint in the API, which is the twelve
+  // reports plus the sales, debts and customers lists.
+  //
+  // These three are the odd ones out in this table: they are **400s raised
+  // after validation passed**, not 422s. `validate` accepts `from`/`to` as
+  // soon as they match `/^\d{4}-\d{2}-\d{2}$/`, and it is `resolvePeriod` —
+  // running inside the service — that then rejects the pair
+  // (`Backend/src/lib/period.ts:79,84,86-88`, transcribed in
+  // `docs/contracts/reports.md` §1.4). So a caller who branches only on
+  // `status === 422` and `fieldErrors` never sees them, which is exactly how
+  // they went unmapped until the reports slice.
+  /** `from` after `to`, or one of the pair missing. `period.ts:79,84`. */
+  INVALID_PERIOD: "INVALID_PERIOD",
+  /** More than `MAX_PERIOD_DAYS` (366) inclusive days apart. `period.ts:86-88`. */
+  PERIOD_TOO_LONG: "PERIOD_TOO_LONG",
+  /** Date-shaped but not a date on the calendar — `2026-02-31`. `period.ts:51,58`. */
+  INVALID_DATE: "INVALID_DATE",
+
   // Products and stock.
   DUPLICATE_BARCODE: "DUPLICATE_BARCODE",
   PRODUCT_ARCHIVED: "PRODUCT_ARCHIVED",

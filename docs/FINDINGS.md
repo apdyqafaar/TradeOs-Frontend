@@ -298,6 +298,15 @@ link. Making either guest-only breaks a supported flow.
 - **Passkey login renders disabled.** The backend supports it; the WebAuthn ceremony is unbuilt.
 - **`SheetOverlay` hardcodes `bg-black/10`** where the canvas wants ~45%; it is inside vendored
   `components/ui/sheet.tsx`.
+- **Three things the reports screens want and the API cannot give** (`docs/findings/slice5-reports.md`
+  §5): there is **no export endpoint** behind the design's Export chip; **no period-over-period
+  figure**, so "up 12% on last month" cannot be shown without a second request per number and a
+  client-side subtraction; and **366 days is a hard ceiling** on any range, which rules out a
+  year-on-year view. The Export chip and the reserved Highlights card were left unbuilt rather than
+  shipped as controls that do nothing.
+- **`typedRoutes` can now be turned on.** It was off because most paths in `config/routes.ts` had no
+  page; every one of them does as of 2026-09-10. Worth its own change — the first build with it on
+  is the one that finds every stale `href`.
 
 ---
 
