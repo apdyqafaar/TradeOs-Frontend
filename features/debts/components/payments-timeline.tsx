@@ -12,6 +12,7 @@ import { useDebtPayments } from "@/features/debts/hooks/use-debt-payments";
 import { voidPaymentSchema } from "@/features/debts/schemas/debt.schema";
 import type { Debt, Payment } from "@/features/debts/types";
 import { useOrganization } from "@/features/organization/hooks/use-organization";
+import { MemberRef } from "@/features/team/components/member-ref";
 import {
   API_ERROR_CODE,
   type ApiError,
@@ -57,11 +58,11 @@ export interface PaymentsTimelineProps {
  * Two things the canvas draws that the payload cannot fill:
  *
  *   1. **Who took the money.** `receivedBy` is a bare Member id — there is no
- *      `populate` anywhere in the debts/payments backend path — and there is no
- *      members slice to resolve it against. So the cell is an em dash with the
- *      id in its `title`, which is traceable without being an invented name.
- *      `stock-movements-table.tsx` reached the same place for its "Who" column;
- *      this follows it rather than inventing a second answer.
+ *      `populate` anywhere in the debts/payments backend path — so the name
+ *      comes from the shared team directory through `<MemberRef>`, the same
+ *      component the sales table and the stock-movements "Who" column use. It
+ *      falls back to an em dash with the id in its `title` when the directory
+ *      cannot name them, which is traceable without being an invented name.
  *   2. **The frozen exchange rate.** A payment tendered in the exchange
  *      currency carries `exchangeRate`, and the canvas's second line has room
  *      only for the tendered amount. `formatExchange(...).converted` would
@@ -247,16 +248,15 @@ function PaymentRow({ payment, currency, timezone, canVoid }: PaymentRowProps) {
 
       <div className="flex flex-wrap items-center gap-2.5">
         {/*
-          `receivedBy` is a Member id and nothing in this response names them.
-          An em dash with the id in `title` is traceable; a name assembled from
-          anything on this page would be fiction.
+          `receivedBy` is a bare Member id — this response never names them.
+          `<MemberRef>` resolves it against the shared team directory and falls
+          back to the em dash it used to print unconditionally.
         */}
-        <span
-          className="text-[12px] text-muted-foreground"
-          title={`Received by member ${payment.receivedBy}`}
-        >
-          —
-        </span>
+        <MemberRef
+          memberId={payment.receivedBy}
+          action="Received"
+          className="text-[12px]"
+        />
         {payment.note ? (
           <span className="text-[12px] text-muted-2">· {payment.note}</span>
         ) : null}

@@ -1,9 +1,35 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Sale } from "@/features/sales/types";
 import { SaleTable } from "./sale-table";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+
+// The stub map is module state; without this a test that names a member
+// leaves them named for every test after it, and the fallback tests pass or
+// fail on their position in the file.
+beforeEach(() => {
+  members.names = {};
+});
+
+/**
+ * The member directory, stubbed.
+ *
+ * `<MemberRef>` resolves ids through `useMemberNames()`, which reads a shared
+ * React Query. Mocking that hook rather than standing up a QueryClient keeps
+ * these tests about this component, and lets one line decide whether a member
+ * is nameable — which is the only thing the cell branches on.
+ */
+const members = vi.hoisted(() => ({ names: {} as Record<string, string> }));
+
+vi.mock("@/features/team/hooks/use-member-names", () => ({
+  useMemberNames: () => ({
+    resolve: (id?: string | null) => (id ? (members.names[id] ?? null) : null),
+    display: (id?: string | null) => (id ? (members.names[id] ?? "—") : "—"),
+    isLoading: false,
+    isError: false,
+  }),
+}));
 
 const sale = (overrides: Partial<Sale> = {}): Sale => ({
   id: "s1",
@@ -79,10 +105,21 @@ describe("SaleTable", () => {
     expect(screen.getByText(/Customer cu-9/)).toBeInTheDocument();
   });
 
+  it("names the seller from the shared member directory", () => {
+    // The canvas reads "Amina Mohamed" in this column. `soldBy` is a bare
+    // Member id, so the name can only come from `GET /members` — one shared
+    // request for the whole page, not one per row.
+    members.names = { "mem-1": "Amina Mohamed" };
+    render(<SaleTable {...props} rows={[sale()]} />);
+
+    expect(screen.getByText("Amina Mohamed")).toBeInTheDocument();
+  });
+
   it("keeps the member id traceable rather than fabricating a name", () => {
-    // `soldBy` is a Member id, there is no members slice, and a receipt someone
-    // is disputing must not carry a name this screen made up. Same treatment as
-    // the "Who" column in `stock-movements-table.tsx`.
+    // Nothing in the directory resolves `mem-1` here. A receipt someone is
+    // disputing must not carry a name this screen made up, so it falls back to
+    // the id — same treatment as the "Who" column in
+    // `stock-movements-table.tsx`, which shares this component.
     render(<SaleTable {...props} rows={[sale()]} />);
 
     expect(screen.getByText("Recorded by member mem-1")).toBeInTheDocument();

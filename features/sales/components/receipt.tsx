@@ -18,10 +18,10 @@ import { ROUTES } from "@/config/routes";
 import { useCan } from "@/features/auth/hooks/use-permission";
 import { useCustomer } from "@/features/customers/hooks/use-customer";
 import { useOrganization } from "@/features/organization/hooks/use-organization";
-import { MemberRef } from "@/features/sales/components/sale-table";
 import { VoidSaleDialog } from "@/features/sales/components/void-sale-dialog";
 import { useSale } from "@/features/sales/hooks/use-sale";
 import type { Sale, SaleItem, SalePaymentStatus } from "@/features/sales/types";
+import { MemberRef } from "@/features/team/components/member-ref";
 import { API_ERROR_CODE, type ApiError } from "@/lib/api/errors";
 import type { ObjectId } from "@/lib/api/types";
 import { PERMISSIONS } from "@/lib/auth/permissions";
@@ -94,11 +94,12 @@ function isMissingSale(error: ApiError | null): boolean {
  *      does not rewrite an old receipt. Re-pricing a line from
  *      `GET /products/:id` would show a customer a number they were never
  *      charged (`docs/contracts/sales.md` §5).
- *   2. **Nothing is populated.** `soldBy` and `voidedBy` are bare Member ids
- *      with no members endpoint in this build, so `<MemberRef>` prints an em
- *      dash carrying the id rather than a name this screen invented. The
- *      customer is the one exception, because one page about one sale can
- *      afford one `GET /customers/:id`.
+ *   2. **Nothing is populated.** `soldBy` and `voidedBy` are bare Member ids,
+ *      so `<MemberRef>` resolves them against the shared team directory —
+ *      one request for the page, not one per id — and falls back to an em
+ *      dash carrying the id when it cannot. The customer is fetched
+ *      separately, because one page about one sale can afford one
+ *      `GET /customers/:id`.
  *   3. **Two of the payment figures are in a different currency from the rest**
  *      — `amountTendered` and `change` are in `payment.currency`, everything
  *      else is in the business's main currency — so the payment card labels

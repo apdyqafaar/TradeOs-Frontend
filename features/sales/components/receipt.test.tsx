@@ -34,6 +34,25 @@ vi.mock("@/features/organization/hooks/use-organization", () => ({
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
+/**
+ * The member directory, stubbed.
+ *
+ * `<MemberRef>` resolves ids through `useMemberNames()`, which reads a shared
+ * React Query. Mocking that hook rather than standing up a QueryClient keeps
+ * these tests about this component, and lets one line decide whether a member
+ * is nameable — which is the only thing the cell branches on.
+ */
+const members = vi.hoisted(() => ({ names: {} as Record<string, string> }));
+
+vi.mock("@/features/team/hooks/use-member-names", () => ({
+  useMemberNames: () => ({
+    resolve: (id?: string | null) => (id ? (members.names[id] ?? null) : null),
+    display: (id?: string | null) => (id ? (members.names[id] ?? "—") : "—"),
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
 const sale = (overrides: Partial<Sale> = {}): Sale => ({
   id: "s1",
   number: "S-000129",
@@ -94,6 +113,7 @@ const failed = (error: ApiError) => ({
 });
 
 beforeEach(() => {
+  members.names = {};
   vi.clearAllMocks();
   granted = ["sales:void", "customers:view", "debts:view"];
   customerQuery.mockReturnValue({
@@ -286,6 +306,16 @@ describe("Receipt", () => {
 
     expect(screen.getByText(/couldn.t be loaded/i)).toBeInTheDocument();
     expect(screen.getAllByText("USD 40.00").length).toBeGreaterThan(0);
+  });
+
+  it('names the member who rang the sale up, with the canvas\'s "by"', () => {
+    members.names = { "mem-1": "Amina Mohamed" };
+    saleQuery.mockReturnValue(loaded());
+    render(<Receipt saleId="s1" />);
+
+    // "by" is `<MemberRef>`'s `prefix`, so it is one phrase to a screen
+    // reader rather than "by" sitting loose beside the name.
+    expect(screen.getByText("by Amina Mohamed")).toBeInTheDocument();
   });
 
   it("never invents a name for the member who rang the sale up", () => {

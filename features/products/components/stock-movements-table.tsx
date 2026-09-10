@@ -14,6 +14,7 @@ import type {
   StockMovement,
   StockMovementType,
 } from "@/features/products/types";
+import { MemberRef } from "@/features/team/components/member-ref";
 import type { ObjectId } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format/date";
 import { formatQuantity } from "@/lib/format/money";
@@ -73,10 +74,10 @@ interface StockMovementsTableProps {
  *      is what the endpoint actually guarantees.
  *   2. **The "Who" column.** `StockMovement.createdBy` is a bare member id —
  *      `publicMovement` does `movement.createdBy.toString()` — and there is no
- *      name anywhere in this response. Resolving it means `GET /members`, a
- *      whole feature slice this task may not create; so the column renders an
- *      em dash with the id in its `title`, which is traceable without being a
- *      fabricated name. `docs/findings/s2-task-07.md` has the full reasoning
+ *      name anywhere in this response. `<MemberRef>` resolves it against the
+ *      shared team directory, which costs one request no matter how many rows
+ *      ask, and falls back to the em dash with the id in its `title` when the
+ *      directory cannot name them or the caller may not read it. `docs/findings/s2-task-07.md` has the full reasoning
  *      and what turning it on would cost.
  *   3. **A link to the receipt.** A `sale` or `sale_void` carries a `saleId`,
  *      but `/sales/[id]` does not exist until Slice 3, so the reference is
@@ -140,12 +141,7 @@ export function StockMovementsTable({
       header: "Who",
       hideBelowMd: true,
       cell: (movement) => (
-        <span
-          className="text-[13px] text-muted-foreground"
-          title={`Recorded by member ${movement.createdBy}`}
-        >
-          —
-        </span>
+        <MemberRef memberId={movement.createdBy} action="Recorded" />
       ),
     },
     {

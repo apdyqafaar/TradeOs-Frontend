@@ -13,6 +13,7 @@ import type {
   SalePaymentStatus,
   SaleStatus,
 } from "@/features/sales/types";
+import { MemberRef } from "@/features/team/components/member-ref";
 import type { ObjectId, PageMeta } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
@@ -213,52 +214,6 @@ export function SaleTable({
       onRowClick={(sale) => router.push(ROUTES.sale(sale.id))}
       pagination={meta ? { ...meta, onPageChange, onLimitChange } : undefined}
     />
-  );
-}
-
-/**
- * Who recorded or reversed a sale — as far as this API will say.
- *
- * **`soldBy` and `voidedBy` are bare `Member` ids** (`publicSale` does
- * `.toString()` on both, `sale.controller.ts:42,44`), not user ids, so they do
- * not match the signed-in user from `/auth/me` either. Resolving them to the
- * "by Amina Mohamed" the canvas draws needs `GET /members`, and there is no
- * members slice in this build.
- *
- * So the id goes in the `title` and the cell renders an em dash — exactly what
- * `features/products/components/stock-movements-table.tsx` already does for
- * its "Who" column. Traceable for anyone holding a disputed receipt, and not a
- * fabricated name on a financial record. Shared between the list and the
- * receipt so the two can never drift into disagreeing about it; it lives in
- * this file because the receipt is the heavier module of the two.
- */
-export function MemberRef({
-  memberId,
-  action,
-  prefix = "",
-  className,
-}: {
-  memberId: ObjectId;
-  /** "Recorded" or "Voided" — the verb the description reads with. */
-  action: string;
-  /** Visible text before the dash, e.g. `"by "` in the receipt header. */
-  prefix?: string;
-  className?: string;
-}) {
-  const description = `${action} by member ${memberId}`;
-
-  return (
-    // The dash is hidden from assistive tech and the full description is read
-    // instead, rather than hung on the span as an `aria-label` — a bare `span`
-    // has no role, so ARIA naming on it is not supported and biome rejects it.
-    // `title` keeps the id reachable with a mouse.
-    <span
-      className={cn("text-[13px] text-muted-foreground", className)}
-      title={description}
-    >
-      <span aria-hidden="true">{prefix}—</span>
-      <span className="sr-only">{description}</span>
-    </span>
   );
 }
 

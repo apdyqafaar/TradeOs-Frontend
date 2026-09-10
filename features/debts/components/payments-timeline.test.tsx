@@ -31,6 +31,25 @@ vi.mock("@/features/organization/hooks/use-organization", () => ({
   }),
 }));
 
+/**
+ * The member directory, stubbed.
+ *
+ * `<MemberRef>` resolves ids through `useMemberNames()`, which reads a shared
+ * React Query. Mocking that hook rather than standing up a QueryClient keeps
+ * these tests about this component, and lets one line decide whether a member
+ * is nameable — which is the only thing the cell branches on.
+ */
+const members = vi.hoisted(() => ({ names: {} as Record<string, string> }));
+
+vi.mock("@/features/team/hooks/use-member-names", () => ({
+  useMemberNames: () => ({
+    resolve: (id?: string | null) => (id ? (members.names[id] ?? null) : null),
+    display: (id?: string | null) => (id ? (members.names[id] ?? "—") : "—"),
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
 const wrapper = ({ children }: { children: ReactNode }) => (
   <NuqsTestingAdapter>{children}</NuqsTestingAdapter>
 );
@@ -61,6 +80,7 @@ const loaded = (items: Payment[]) => ({
 });
 
 beforeEach(() => {
+  members.names = {};
   vi.clearAllMocks();
   can.mockReturnValue(true);
   voidMutation.mockReturnValue({
@@ -109,9 +129,18 @@ describe("PaymentsTimeline", () => {
     expect(screen.getByText("tendered USD 50.00")).toBeInTheDocument();
   });
 
+  it("names the member who took the money", () => {
+    members.names = { "mem-42": "Hodan Yusuf" };
+    list.mockReturnValue(loaded([payment()]));
+    render(<PaymentsTimeline debtId="d1" debtStatus="open" />, { wrapper });
+
+    expect(screen.getByText("Hodan Yusuf")).toBeInTheDocument();
+  });
+
   it("does not invent a name for the member who took the money", () => {
-    // `receivedBy` is a bare Member id and there is no members slice to
-    // resolve it against. The id stays reachable through `title`.
+    // The directory is empty here — a removed member, or a caller without
+    // `members:view`. The id stays reachable through `title` rather than the
+    // cell inventing someone.
     list.mockReturnValue(loaded([payment()]));
     render(<PaymentsTimeline debtId="d1" debtStatus="open" />, { wrapper });
 
