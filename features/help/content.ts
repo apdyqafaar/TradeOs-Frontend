@@ -15,12 +15,15 @@
  * behaviour changes, this file changes with it — treat it as documentation
  * that ships, not marketing copy.
  *
- * Deliberately absent: anything about reports, projects, announcements, team
- * management or settings. Those screens do not exist yet, and an article about
- * a page a reader cannot open is a support ticket, not help.
+ * The rule is that an article about a page a reader cannot open is a support
+ * ticket, not help — so this file grew when those pages did. Reports,
+ * projects, announcements, team management and settings were all deliberately
+ * absent while unbuilt, and were written on 2026-09-10 when their screens
+ * shipped. `components/help-center.test.tsx` fails if a shipped area has no
+ * article, so the Help Center cannot quietly fall a slice behind again.
  */
 
-export type HelpSection = "counter" | "money" | "stock" | "people";
+export type HelpSection = "counter" | "money" | "stock" | "business" | "people";
 
 /**
  * One paragraph of an article. `kind` is what the paragraph *is*, not how it
@@ -54,6 +57,7 @@ export const HELP_SECTIONS: { id: HelpSection; label: string }[] = [
   { id: "counter", label: "At the counter" },
   { id: "money", label: "Money owed to you" },
   { id: "stock", label: "Products and stock" },
+  { id: "business", label: "Running the business" },
   { id: "people", label: "Your team" },
 ];
 
@@ -311,6 +315,242 @@ export const HELP_ARTICLES: HelpArticle[] = [
       {
         kind: "note",
         text: "A change to someone's role takes effect on their very next action. There is nothing to sign out of and back into.",
+      },
+    ],
+  },
+  {
+    id: "inviting-a-teammate",
+    title: "Inviting someone to your business",
+    section: "people",
+    summary: "Sending an invitation, and what removing someone actually does.",
+    keywords: ["invite", "add", "staff", "employee", "join", "remove", "fire"],
+    body: [
+      {
+        kind: "text",
+        text: "Members → Invite takes an email address and the role they should have. They appear in the list straight away as Invited, and become Active when they accept and set their password.",
+      },
+      {
+        kind: "text",
+        text: "An invitation that goes astray can be sent again from the row's menu. The list shows the date you invited them, which is the only date a pending row has.",
+      },
+      {
+        kind: "note",
+        text: "Removing someone is permanent from the list's point of view — they disappear from it and from the count, and there is no view of former staff to bring them back from. What they did stays: their sales, their stock movements and the payments they took all keep their name.",
+      },
+      {
+        kind: "text",
+        text: "There is no way to hand the business to someone else. The owner is fixed for the life of the business.",
+      },
+    ],
+  },
+  {
+    id: "roles-and-permissions",
+    title: "Making your own roles",
+    section: "people",
+    summary: "Building a role that fits how your shop actually works.",
+    keywords: ["role", "custom", "permission", "matrix", "manager", "delete"],
+    body: [
+      {
+        kind: "text",
+        text: "Members → Roles lists every role with how many people hold it. Add your own and tick exactly what it may do — a night-shift role that sells and takes payments but cannot touch prices, for instance.",
+      },
+      {
+        kind: "note",
+        text: "A role somebody holds cannot be deleted. The count beside it is what stands in the way, so move those people to another role first and the count drops to zero.",
+      },
+      {
+        kind: "text",
+        text: "The Owner role cannot be edited or deleted. It is the one role that always has everything, which is what makes it safe to experiment with the others.",
+      },
+    ],
+  },
+  {
+    id: "reading-your-reports",
+    title: "Reading your reports",
+    section: "business",
+    summary: "Choosing a period, and what each figure is actually counting.",
+    keywords: [
+      "report",
+      "revenue",
+      "profit",
+      "margin",
+      "period",
+      "export",
+      "print",
+    ],
+    body: [
+      {
+        kind: "text",
+        text: "Reports has six views — an overview and then Sales, Products, Debts, Customers and Staff. The period you pick carries across all of them, so setting This year on one and clicking to another keeps you in this year.",
+      },
+      {
+        kind: "text",
+        text: "Every period is worked out in your business's timezone, not your device's, and the bar says which one that is. An owner reading a Nairobi shop from another country sees the shop's day, not their own.",
+      },
+      {
+        kind: "note",
+        text: "Revenue counts a credit sale in full on the day it was rung up, whether or not the money has arrived. What actually came in is Collected. The two are different numbers on purpose.",
+      },
+      {
+        kind: "note",
+        text: "On the Staff report, Collected means debt repayments that person received. It is not the cash they took at the till, so it is normally much smaller than their revenue.",
+      },
+      {
+        kind: "text",
+        text: "In a top-ten list, the share beside a row is its share of the ten shown — not of everything you sold. The panel says so above the list.",
+      },
+      {
+        kind: "note",
+        text: "A range can cover at most 366 days, and there is no All time. Reports cannot be exported or printed to a file yet.",
+      },
+    ],
+  },
+  {
+    id: "debts-report-right-now",
+    title: "Why some debt figures ignore the period",
+    section: "business",
+    summary:
+      "Four numbers on the debts report are about today, not the period.",
+    keywords: [
+      "debt",
+      "outstanding",
+      "overdue",
+      "period",
+      "today",
+      "right now",
+    ],
+    body: [
+      {
+        kind: "text",
+        text: "Outstanding, Open debts, Overdue and Overdue amount describe where you stand right now. They do not change when you change the period, because there is no such thing as what you were owed “last month” — you are owed what you are owed today.",
+      },
+      {
+        kind: "text",
+        text: "New debt, Collected and Written off do move with the period. Those are things that happened inside the dates you chose.",
+      },
+      {
+        kind: "note",
+        text: "The two groups are shown under separate headings for exactly this reason. Reading all of them as one month's story is the mistake the layout is there to prevent.",
+      },
+    ],
+  },
+  {
+    id: "sharing-a-project",
+    title: "Sharing a project with a client",
+    section: "business",
+    summary:
+      "Publishing a page a customer can open, and the link you only see once.",
+    keywords: ["project", "client", "share", "link", "publish", "public"],
+    body: [
+      {
+        kind: "text",
+        text: "A project holds the progress and the updates for a job you are doing for someone. Publishing it produces a link that anybody holding it can open — no account, no password.",
+      },
+      {
+        kind: "note",
+        text: "The link is shown once, at the moment you publish. Copy it then. It is not stored anywhere we can read back, so leaving the page or refreshing loses it, and the screen tells you when that has happened.",
+      },
+      {
+        kind: "text",
+        text: "If you lose it, New link makes another one. That also stops every link you have already given out from working, so only do it if you are ready to send the new one to everybody.",
+      },
+      {
+        kind: "note",
+        text: "Unpublishing takes the page down immediately. Anyone opening the old link after that gets nothing — there is no grace period.",
+      },
+    ],
+  },
+  {
+    id: "posting-an-announcement",
+    title: "Posting a notice for your team",
+    section: "business",
+    summary: "Announcements, pinning, and who sees them.",
+    keywords: ["announcement", "notice", "post", "pin", "news", "team"],
+    body: [
+      {
+        kind: "text",
+        text: "Announcements is a noticeboard everybody in the business can read. Write one, optionally give it a cover image, and it appears at the top of the feed with your name and when you posted it.",
+      },
+      {
+        kind: "text",
+        text: "Pin the ones that should not scroll away — a pinned notice stays above the rest no matter how much is posted after it. Unpin it and it drops back into date order.",
+      },
+      {
+        kind: "note",
+        text: "There is no search here. The feed is paged, so an old notice is found by turning pages rather than by typing.",
+      },
+    ],
+  },
+  {
+    id: "business-settings",
+    title: "Your business details and currencies",
+    section: "business",
+    summary:
+      "The name on your receipts, your timezone, and the money you take.",
+    keywords: [
+      "settings",
+      "timezone",
+      "currency",
+      "logo",
+      "name",
+      "rate",
+      "address",
+    ],
+    body: [
+      {
+        kind: "text",
+        text: "Settings → Business holds the name, phone, address and logo that appear on your receipts and on any project page you share.",
+      },
+      {
+        kind: "note",
+        text: "The timezone is not cosmetic. Every report, every receipt time and every daily total is measured in it, so changing it changes what counts as today.",
+      },
+      {
+        kind: "text",
+        text: "Settings → Currency sets the one currency you keep your books in, and optionally a second one you accept at the counter with the rate between them. Totals and reports are always in the first; only what a customer physically handed over is recorded in the second.",
+      },
+      {
+        kind: "note",
+        text: "Changing the rate never rewrites an old receipt. Each sale keeps the rate that was in force when it was rung up.",
+      },
+    ],
+  },
+  {
+    id: "your-account-and-security",
+    title: "Your account and signing in",
+    section: "people",
+    summary: "Password, two-factor, and the devices you are signed in on.",
+    keywords: [
+      "password",
+      "account",
+      "security",
+      "2fa",
+      "two-factor",
+      "passkey",
+      "session",
+      "device",
+      "email",
+    ],
+    body: [
+      {
+        kind: "text",
+        text: "Account → Profile is your name and picture. Security is where you change your password and turn on two-factor, which asks for a code from your phone as well as your password.",
+      },
+      {
+        kind: "text",
+        text: "Sessions lists the devices you are signed in on. Sign out other devices ends all of them except the one you are using — useful if you have left yourself signed in somewhere you no longer have.",
+      },
+      {
+        kind: "note",
+        text: "It is all of them or none: there is no way to sign out one device and leave the rest.",
+      },
+      {
+        kind: "note",
+        text: "Your email address cannot be changed. If it needs to be a different one, an owner invites the new address instead.",
+      },
+      {
+        kind: "text",
+        text: "Passkeys can be registered and removed here, but signing in with one is not available yet — use your password.",
       },
     ],
   },
