@@ -54,6 +54,13 @@ export const ROUTES = {
   reportsCustomers: "/reports/customers",
   reportsStaff: "/reports/staff",
   announcements: "/announcements",
+  /**
+   * The reading screen for one notice. Deliberately absent from
+   * `ROUTE_PERMISSIONS` below, like its parent: `announcements:view` is held by
+   * every preset, so it inherits the parent's "open to every member" by
+   * longest-prefix match and a row here would only add a way to be wrong.
+   */
+  announcement: (id: string) => `/announcements/${id}`,
   projects: "/projects",
   project: (id: string) => `/projects/${id}`,
   /** Members live at /team; Roles is its sub-page. */
