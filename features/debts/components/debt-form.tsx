@@ -3,9 +3,9 @@
 import { tz } from "@date-fns/tz";
 import { cn } from "cn";
 import { format } from "date-fns";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
+import { ButtonLink } from "@/components/shared/button-link";
 import { MoneyInput } from "@/components/shared/money-input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -428,13 +428,13 @@ export function DebtForm() {
       ) : null}
 
       <div className="flex items-center justify-end gap-2.5">
-        <Button
+        <ButtonLink
           variant="outline"
           className="h-10 rounded-[10px] px-4 text-[13px]"
-          render={<Link href={ROUTES.debts} />}
+          href={ROUTES.debts}
         >
           Cancel
-        </Button>
+        </ButtonLink>
         <Button
           type="submit"
           // Held until the organization lands: the amount has no currency to be

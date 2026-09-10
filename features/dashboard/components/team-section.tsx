@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/shared/button-link";
 import { ROUTES } from "@/config/routes";
 import { PanelFigure } from "@/features/dashboard/components/debts-section";
 import { SectionStrip } from "@/features/dashboard/components/section-strip";
@@ -41,13 +41,13 @@ export function TeamSection({ section }: TeamSectionProps) {
           }
         />
         <span className="flex-1" />
-        <Button
+        <ButtonLink
           variant="outline"
           className="h-9 rounded-[10px] px-3.5 text-[13px]"
-          render={<Link href={ROUTES.team} />}
+          href={ROUTES.team}
         >
           Invite
-        </Button>
+        </ButtonLink>
       </div>
     </SectionStrip>
   );

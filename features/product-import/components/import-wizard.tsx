@@ -2,9 +2,9 @@
 
 import { cn } from "cn";
 import { ArrowLeft, Check } from "lucide-react";
-import Link from "next/link";
 import { parseAsString, useQueryState } from "nuqs";
 import { useState } from "react";
+import { ButtonLink } from "@/components/shared/button-link";
 import { ErrorCard } from "@/components/shared/error-card";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/config/routes";
@@ -75,14 +75,14 @@ export function ImportWizard() {
           </p>
         </div>
 
-        <Button
+        <ButtonLink
           variant="outline"
           className="h-10 rounded-[10px] px-4 text-[13px]"
-          render={<Link href={ROUTES.products} />}
+          href={ROUTES.products}
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
           Back to products
-        </Button>
+        </ButtonLink>
       </header>
 
       {jobId ? (
@@ -350,12 +350,12 @@ function FinishedJob({ job, onLeave }: FinishedJobProps) {
       <CommitBar jobId={job.id} job={job} />
 
       <div className="flex flex-wrap gap-2.5">
-        <Button
+        <ButtonLink
           className="h-10 rounded-[10px] px-4 text-[13px]"
-          render={<Link href={ROUTES.products} />}
+          href={ROUTES.products}
         >
           See the products
-        </Button>
+        </ButtonLink>
         <Button
           variant="outline"
           onClick={onLeave}

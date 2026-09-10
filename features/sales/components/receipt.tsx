@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { ButtonLink } from "@/components/shared/button-link";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorCard } from "@/components/shared/error-card";
 import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
@@ -153,9 +154,9 @@ export function Receipt({ saleId }: ReceiptProps) {
           title="This receipt doesn't exist"
           description="The link may be out of date, or the sale may belong to another business."
           action={
-            <Button variant="outline" render={<Link href={ROUTES.sales} />}>
+            <ButtonLink variant="outline" href={ROUTES.sales}>
               Back to sales
-            </Button>
+            </ButtonLink>
           }
         />
       </div>

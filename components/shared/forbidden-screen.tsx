@@ -1,6 +1,5 @@
 import { Lock } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/shared/button-link";
 import { ROUTES } from "@/config/routes";
 
 /**
@@ -33,13 +32,9 @@ export function ForbiddenScreen() {
       <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
         Ask an owner or manager if you need it.
       </p>
-      <Button
-        variant="outline"
-        className="mt-5"
-        render={<Link href={ROUTES.overview} />}
-      >
+      <ButtonLink variant="outline" className="mt-5" href={ROUTES.overview}>
         Back to overview
-      </Button>
+      </ButtonLink>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ButtonLink } from "@/components/shared/button-link";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorCard } from "@/components/shared/error-card";
 import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
@@ -72,13 +73,9 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
         title="This project is gone"
         description="It was deleted, or the link points at something in another business."
         action={
-          <Button
-            variant="outline"
-            size="sm"
-            render={<Link href={ROUTES.projects} />}
-          >
+          <ButtonLink variant="outline" size="sm" href={ROUTES.projects}>
             Back to projects
-          </Button>
+          </ButtonLink>
         }
       />
     );

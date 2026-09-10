@@ -101,6 +101,39 @@ values with a comment naming the decision. Do not "fix" them without asking.
 
 ## 2. Bugs found and fixed — each one shipped green
 
+### 24 links-that-look-like-buttons were announced and keyed as buttons
+**Fixed 2026-09-10.** Every "New sale", "Back to products", "Import" and empty-state action in
+the product was `<Button render={<Link href={…} />}>`. Base UI's `Button` has exactly two modes
+and **neither one is a link** (`@base-ui/react/internals/use-button/useButton.js:183-187`):
+
+```js
+isNativeButton ? { type: 'button' } : { role: 'button' }
+```
+
+Left at the default `true`, it put `type="button"` on the `<a>` — where `type` is a content-type
+hint and means nothing — and made `isLink` compute `false`, so **Space activated the anchor** like
+a button. Links follow on Enter; Space is supposed to scroll the page. It also logged a console
+error on every affected page.
+
+The trap is the fix that suggests itself. The console error names `nativeButton={false}`, and
+setting it does silence the error and correct the key handling — by putting `role="button"` on the
+anchor, so assistive technology stops announcing a link at all and the element drops out of the
+page's list of links. That was tried first here and was caught by an existing test asserting the
+"New debt" control is reachable `byRole("link")` — the one test in the suite that happened to care
+about the role.
+
+The answer is not to configure `Button` but not to use it: `<ButtonLink>`
+(`components/shared/button-link.tsx`) renders a real `<Link>` and borrows the styling through the
+exported `buttonVariants`, so it is an ordinary anchor — role link, Enter to follow, Space to
+scroll, middle-click and right-click behaving as a reader expects — dressed by the same cva.
+
+**Found in a browser, not by a test**: the Next dev overlay showed "1 Issue" on `/sales` during a
+pass over the finished slices. Nothing in 998 tests had an opinion. There is now a source-walk
+guard (`components/shared/button-as-link.test.ts`) that fails naming any file that reintroduces
+the pattern; break-tested. `<DropdownMenuItem render={<Link />}>` is deliberately not matched —
+Base UI's `MenuItem` already defaults `nativeButton` to `false`, and `role="menuitem"` is correct
+for a menu entry.
+
 ### `login-form.tsx` pushed an unvalidated `?next=` — an open redirect
 **Fixed 2026-09-09.** `router.push(searchParams.get("next") ?? ROUTES.overview)` trusted a value
 that lives in a URL anyone can compose. `/login?next=//evil.example` is protocol-relative: the

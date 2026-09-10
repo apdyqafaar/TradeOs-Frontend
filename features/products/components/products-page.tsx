@@ -2,7 +2,7 @@
 
 import { cn } from "cn";
 import { Package, Plus } from "lucide-react";
-import Link from "next/link";
+import { ButtonLink } from "@/components/shared/button-link";
 import { DataTable } from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorCard } from "@/components/shared/error-card";
@@ -110,21 +110,21 @@ export function ProductsPage() {
               endpoints gate on `products:create` and there is no separate
               import permission (`docs/contracts/product-import.md` §0).
             */}
-            <Button
+            <ButtonLink
               variant="outline"
               className="h-10 rounded-[10px] px-4 text-[13px]"
-              render={<Link href={ROUTES.productImport} />}
+              href={ROUTES.productImport}
             >
               Import
-            </Button>
+            </ButtonLink>
 
-            <Button
+            <ButtonLink
               className="h-10 rounded-[10px] px-4 text-[13px]"
-              render={<Link href={ROUTES.productNew} />}
+              href={ROUTES.productNew}
             >
               <Plus className="size-4" aria-hidden="true" />
               New product
-            </Button>
+            </ButtonLink>
           </div>
         ) : null}
       </header>
@@ -256,10 +256,10 @@ function ProductList({
         icon={Package}
         action={
           canCreate ? (
-            <Button render={<Link href={ROUTES.productNew} />}>
+            <ButtonLink href={ROUTES.productNew}>
               <Plus className="size-4" aria-hidden="true" />
               New product
-            </Button>
+            </ButtonLink>
           ) : undefined
         }
       />

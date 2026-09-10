@@ -1,9 +1,9 @@
 "use client";
 
 import { ArrowLeft, Megaphone, Pin, PinOff, Trash2 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ButtonLink } from "@/components/shared/button-link";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorCard } from "@/components/shared/error-card";
 import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
@@ -112,15 +112,15 @@ function Reading({ announcement, timezone }: ReadingProps) {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <Button
+        <ButtonLink
           variant="ghost"
           size="sm"
           className="-ml-2 h-8 gap-1.5 px-2 text-[13px] text-muted-foreground"
-          render={<Link href={ROUTES.announcements} />}
+          href={ROUTES.announcements}
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
           Announcements
-        </Button>
+        </ButtonLink>
       </div>
 
       <article className="flex flex-col gap-[18px] rounded-xl border border-border bg-card p-6 sm:p-9">
@@ -327,12 +327,9 @@ export function AnnouncementDetail({
         description="It was deleted, or the link points somewhere that never existed. Announcements cannot be restored."
         icon={Megaphone}
         action={
-          <Button
-            variant="outline"
-            render={<Link href={ROUTES.announcements} />}
-          >
+          <ButtonLink variant="outline" href={ROUTES.announcements}>
             Back to announcements
-          </Button>
+          </ButtonLink>
         }
       />
     );

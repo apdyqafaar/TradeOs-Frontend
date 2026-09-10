@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { ButtonLink } from "@/components/shared/button-link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -84,12 +85,12 @@ function DeadLinkPanel() {
         <span className="flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
           <Link2Off aria-hidden="true" strokeWidth={1.75} className="size-5" />
         </span>
-        <Button
-          render={<Link href={ROUTES.forgotPassword} />}
+        <ButtonLink
           className="h-11 w-full rounded-[10px] text-sm"
+          href={ROUTES.forgotPassword}
         >
           Send a new link
-        </Button>
+        </ButtonLink>
       </div>
     </AuthCard>
   );

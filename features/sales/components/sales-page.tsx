@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus, Receipt } from "lucide-react";
-import Link from "next/link";
+import { ButtonLink } from "@/components/shared/button-link";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorCard } from "@/components/shared/error-card";
 import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
@@ -96,10 +96,10 @@ export function SalesPage() {
       icon={Receipt}
       action={
         canCreate ? (
-          <Button render={<Link href={ROUTES.newSale} />}>
+          <ButtonLink href={ROUTES.newSale}>
             <Plus className="size-4" aria-hidden="true" />
             New sale
-          </Button>
+          </ButtonLink>
         ) : undefined
       }
     />
@@ -120,13 +120,13 @@ export function SalesPage() {
         </div>
 
         {canCreate ? (
-          <Button
+          <ButtonLink
             className="h-10 rounded-[10px] px-4 text-[13px]"
-            render={<Link href={ROUTES.newSale} />}
+            href={ROUTES.newSale}
           >
             <Plus className="size-4" aria-hidden="true" />
             New sale
-          </Button>
+          </ButtonLink>
         ) : null}
       </header>
 

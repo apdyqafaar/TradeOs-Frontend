@@ -5,6 +5,7 @@ import { cn } from "cn";
 import { ChevronLeft, ImageOff, PackageX } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { ButtonLink } from "@/components/shared/button-link";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorCard } from "@/components/shared/error-card";
 import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
@@ -93,9 +94,9 @@ export function ProductDetail({ id }: ProductDetailProps) {
           description="It may have been removed, or the link may point at another business."
           icon={PackageX}
           action={
-            <Button variant="outline" render={<Link href={ROUTES.products} />}>
+            <ButtonLink variant="outline" href={ROUTES.products}>
               Back to products
-            </Button>
+            </ButtonLink>
           }
         />
       </div>

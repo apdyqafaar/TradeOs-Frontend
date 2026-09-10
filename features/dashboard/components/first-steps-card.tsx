@@ -2,8 +2,7 @@
 
 import { cn } from "cn";
 import { Check, TrendingUp } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/shared/button-link";
 import { ROUTES } from "@/config/routes";
 import { useCan } from "@/features/auth/hooks/use-permission";
 import { PERMISSIONS } from "@/lib/auth/permissions";
@@ -105,13 +104,13 @@ export function FirstStepsCard({ teamStarted }: FirstStepsCardProps) {
               </span>
               <span className="text-xs text-muted-foreground">{step.note}</span>
             </span>
-            <Button
+            <ButtonLink
               variant={step.done ? "ghost" : "outline"}
               className="h-[34px] flex-none rounded-[9px] px-3.5 text-[13px]"
-              render={<Link href={step.href} />}
+              href={step.href}
             >
               {step.cta}
-            </Button>
+            </ButtonLink>
           </li>
         ))}
       </ol>

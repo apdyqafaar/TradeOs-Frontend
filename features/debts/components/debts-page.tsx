@@ -1,7 +1,7 @@
 "use client";
 
 import { HandCoins, Plus } from "lucide-react";
-import Link from "next/link";
+import { ButtonLink } from "@/components/shared/button-link";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorCard } from "@/components/shared/error-card";
 import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
@@ -139,10 +139,10 @@ export function DebtsPage() {
       // most likely to want this.
       action={
         canCreate ? (
-          <Button render={<Link href={ROUTES.debtNew} />}>
+          <ButtonLink href={ROUTES.debtNew}>
             <Plus className="size-4" aria-hidden="true" />
             New debt
-          </Button>
+          </ButtonLink>
         ) : undefined
       }
     />
@@ -178,13 +178,13 @@ export function DebtsPage() {
           typed URL meets `RouteGuard` rather than a form that can only 403.
         */}
         {canCreate ? (
-          <Button
+          <ButtonLink
             className="h-10 rounded-[10px] px-4 text-[13px]"
-            render={<Link href={ROUTES.debtNew} />}
+            href={ROUTES.debtNew}
           >
             <Plus className="size-4" aria-hidden="true" />
             New debt
-          </Button>
+          </ButtonLink>
         ) : null}
       </header>
 

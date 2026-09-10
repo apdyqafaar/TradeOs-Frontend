@@ -3,6 +3,7 @@
 import { CircleCheck, Link2Off, LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { ButtonLink } from "@/components/shared/button-link";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/config/routes";
 import { AuthCard } from "@/features/auth/components/auth-card";
@@ -125,12 +126,12 @@ export function VerifyEmailPanel({ token }: { token: string | null }) {
               className="size-5"
             />
           </PanelIcon>
-          <Button
-            render={<Link href={ROUTES.overview} />}
+          <ButtonLink
             className="h-11 w-full rounded-[10px] text-sm"
+            href={ROUTES.overview}
           >
             Continue
-          </Button>
+          </ButtonLink>
         </div>
       </AuthCard>
     );
@@ -238,12 +239,12 @@ function DeadLinkPanel() {
           <ResendLink />
         ) : (
           <div className="flex flex-col gap-[7px]">
-            <Button
-              render={<Link href={ROUTES.login} />}
+            <ButtonLink
               className="h-11 w-full rounded-[10px] text-sm"
+              href={ROUTES.login}
             >
               Sign in to send a new link
-            </Button>
+            </ButtonLink>
             <p className="text-[12px] text-muted-3">
               Sending a new link needs your account, and this device isn't
               signed in to it.

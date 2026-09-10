@@ -2,11 +2,11 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { cn } from "cn";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { type DefaultValues, useForm } from "react-hook-form";
 import { z } from "zod";
+import { ButtonLink } from "@/components/shared/button-link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -827,13 +827,13 @@ export function ProductForm({
             Cancel
           </Button>
         ) : (
-          <Button
+          <ButtonLink
             variant="outline"
             className="h-10 rounded-[10px] px-4 text-[13px]"
-            render={<Link href={ROUTES.products} />}
+            href={ROUTES.products}
           >
             Cancel
-          </Button>
+          </ButtonLink>
         )}
 
         <Button

@@ -6,8 +6,8 @@ import { format } from "date-fns";
 import { Info, Plus } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { ButtonLink } from "@/components/shared/button-link";
 import { ErrorCard } from "@/components/shared/error-card";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ROUTES } from "@/config/routes";
 import { useCan } from "@/features/auth/hooks/use-permission";
@@ -135,13 +135,13 @@ export function Overview({ name }: { name: string }) {
         </div>
 
         {canRecordSale ? (
-          <Button
+          <ButtonLink
             className="h-10 rounded-[10px] px-4 text-[13px]"
-            render={<Link href={ROUTES.newSale} />}
+            href={ROUTES.newSale}
           >
             <Plus className="size-4" aria-hidden="true" />
             New sale
-          </Button>
+          </ButtonLink>
         ) : null}
       </header>
 
