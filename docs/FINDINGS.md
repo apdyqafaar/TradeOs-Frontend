@@ -101,6 +101,22 @@ values with a comment naming the decision. Do not "fix" them without asking.
 
 ## 2. Bugs found and fixed — each one shipped green
 
+### `login-form.tsx` pushed an unvalidated `?next=` — an open redirect
+**Fixed 2026-09-09.** `router.push(searchParams.get("next") ?? ROUTES.overview)` trusted a value
+that lives in a URL anyone can compose. `/login?next=//evil.example` is protocol-relative: the
+browser supplies the scheme and leaves the origin, so the victim is walked off this product's
+domain *immediately after typing their password* on a page they reached by trusting that domain.
+`/\evil.example` does the same in browsers that normalise a backslash.
+
+Found by the agent that built the server-side gate, which had already written the predicate for
+its own header and noted in a comment that the login form did not apply it. That predicate now
+lives in `lib/auth/safe-path.ts` — a module with **zero imports**, because both ends need it and
+`lib/auth/server-session.ts` pulls in `next/headers`, which a client component can never import.
+One copy, so the two ends cannot drift about what "internal" means.
+
+Break-tested: restoring the old line turns exactly the three refusal tests red while the
+legitimate-`next` test stays green.
+
 ### `formatExchange` converted money in the wrong direction
 **Fixed.** It divided by the exchange rate where the backend multiplies. `exchangeRate` is *units of
 MAIN per one unit of EXCHANGE* (`Backend/src/lib/money.ts:25-28`, `toMain = amount * rate`), so for

@@ -7,24 +7,24 @@ Guidance for Claude Code working in the TradeOs frontend. The design specificati
 `../Backend/docs/BACKEND-GUIDE.md`. When this file and the brief disagree, the brief wins for
 *what* to build and this file wins for *how*.
 
-## Where things stand (2026-09-08)
+## Where things stand (2026-09-10)
 
-**Slice 1 is complete: auth, the shell, and the Overview.** Every screen a person needs to get into
-the product exists — register, verify email, sign in, two-factor, forgot/reset password, accept an
-invitation, create a business, and a working Overview inside the canvas-exact shell. Routes are
-guarded by permission, and a signed-in user with no business is sent to onboarding.
+**Slices 1–3 are complete.** Auth, the shell and the Overview; products, categories, stock and
+customers; and the counter, the receipt with its void flow, the debts list, debt detail with
+payments and write-off, and manual debt creation.
 
-**Not built:** everything in the design canvas's artboards `2a`–`2m` — the counter, products,
-customers, debts, reports, members, roles, settings, account, projects, announcements, Help Center.
-That is Slice 2 onward, in the order the brief's §10 lists.
+**Not built:** the import wizard (`2e`), reports (`2i`), members and roles (`2j`), settings and
+account (`2k`), projects (`2l`), announcements and Help Center (`2m`).
 
-Verified 2026-09-08: `bun run check` clean (117 tests / 22 files, tsc, biome), `bun run build`
-succeeds across 13 routes, `/login` compared against artboard `1f` in a real browser in both themes,
-and a live round trip through the Next rewrite to Express — register → verify → create business →
-`GET /dashboard` — confirming the wire shapes in `features/dashboard/types.ts`.
+Verified 2026-09-10: 504 tests / 59 files, tsc and biome clean. Slices 2 and 3 were driven in a
+real authenticated browser against a live backend — a credit sale rung up end to end at the
+counter (stock moved, receipt rendered, debt opened and appeared named in the list), and the
+category-protection fix confirmed on screen.
 
-**Never driven in a real authenticated browser session.** The Overview has not been *seen* with real
-data. See `docs/FINDINGS.md` §5.
+**Server-side page protection landed 2026-09-09** after the owner found that a forged cookie
+reached the app shell. Confirmed live: `/overview` with a forged cookie answers 307 to `/login`
+with no shell markup, and a live break-test — short-circuiting the session read — reproduced the
+hole (200 plus a rendered sidebar) before it was restored.
 
 ## Runtime & commands
 
@@ -118,8 +118,16 @@ management page is gated on `members:invite`. This has already caused one wrong 
 adding it there with its permission, or it will not appear in the sidebar.
 
 `proxy.ts` (Next 16 renamed Middleware → Proxy; the file is `proxy.ts`, **not** `middleware.ts`) is
-an **optimistic cookie-presence check only** — it never fetches and never decodes the token. It
-exists to avoid a flash of the shell before a redirect. Real authorization is the API's 401/403.
+still an **optimistic cookie-presence check only** — it never fetches and never decodes the token.
+It exists to avoid a flash of the shell before a redirect, and it forwards the request path on
+`x-tradeos-path` for the layout below.
+
+**The real server-side gate is `app/(app)/layout.tsx`** (added 2026-09-09, after the owner pointed
+out that a forged cookie reached the shell). It is async: it reads the session cookie, calls
+`GET /auth/me` against the API origin with `cache: "no-store"`, and decides before anything
+renders — `/login?next=…` on no session, `/onboarding` on no organization, `ForbiddenScreen`
+inside the shell when the route's permission is missing. **An unreachable API fails closed.** See
+`lib/auth/server-session.ts` and `docs/findings/slice3-server-auth.md`.
 
 `next.config.ts` rewrites `/api/v1/*` to the Express origin so the browser calls the API
 same-origin. That keeps the session cookie first-party, removes CORS entirely, and is what lets
@@ -185,9 +193,13 @@ before starting a slice. Per-task detail is in `docs/findings/`.
 
 Two entries there change how you work and are worth repeating here:
 
-- **The client permission layers are UX, not security.** `proxy.ts` checks only that a cookie
-  exists, `RouteGuard` and `PermissionGate` hide what the caller cannot use, and **the API is the
-  only thing enforcing anything.** Never treat the first two as a boundary.
+- **The client permission layers are UX, not security** — still true, and still not a boundary.
+  `proxy.ts` checks only that a cookie exists; `RouteGuard` and `PermissionGate` hide what the
+  caller cannot use. What changed on 2026-09-09 is that they are no longer the *only* thing in
+  front of a page: `app/(app)/layout.tsx` validates the session server-side before rendering, and
+  `login-form.tsx` no longer pushes an unvalidated `?next=` (that was an open redirect —
+  `//evil.example` walked the user off-origin right after they typed their password). **The API is
+  still the only thing protecting DATA**; the server gate protects pages.
 - **Money direction.** `exchangeRate` is units of *main* per one unit of *exchange*, so converting
   to the main currency **multiplies**. The inverse reads more naturally out loud, which is exactly
   how it shipped backwards once.
