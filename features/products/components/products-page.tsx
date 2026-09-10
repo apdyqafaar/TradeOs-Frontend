@@ -104,23 +104,19 @@ export function ProductsPage() {
         {canCreate ? (
           <div className="flex flex-wrap items-center gap-2.5">
             {/*
-              The import wizard is a later slice (artboard `2e`), and
-              `/products/import` has no page. A link would 404; a button that
-              says why does not pretend. The `title` sits on the wrapper as
-              well as the button because `buttonVariants` sets
-              `disabled:pointer-events-none`, which stops a disabled button
-              from ever raising its own native tooltip.
+              The import wizard (artboard `2e`) now exists. It is inside this
+              `canCreate` block rather than carrying a gate of its own because
+              it needs the same permission: all ten `/products/import`
+              endpoints gate on `products:create` and there is no separate
+              import permission (`docs/contracts/product-import.md` §0).
             */}
-            <span title="Coming soon" className="inline-flex">
-              <Button
-                variant="outline"
-                disabled
-                title="Coming soon"
-                className="h-10 rounded-[10px] px-4 text-[13px]"
-              >
-                Import
-              </Button>
-            </span>
+            <Button
+              variant="outline"
+              className="h-10 rounded-[10px] px-4 text-[13px]"
+              render={<Link href={ROUTES.productImport} />}
+            >
+              Import
+            </Button>
 
             <Button
               className="h-10 rounded-[10px] px-4 text-[13px]"

@@ -272,3 +272,320 @@ features/product-import/
 ```
 
 `lib/api/errors.ts` untouched (§2). No `.tsx` and no route added.
+
+---
+
+# 2026-09-10 (later) — the wizard shell, step 1 (Upload) and step 2 (Map columns)
+
+Artboard `2e`, the first half: `app/(app)/products/import/page.tsx`, the wizard shell, the drop
+zone, the Previous jobs panel and the column mapper. Steps 3 and 4 (`review-step.tsx`,
+`commit-bar.tsx` and the three files under them) were built in parallel by another agent against a
+fixed interface — `<ReviewStep jobId job />` and `<CommitBar jobId job />` — and are theirs.
+
+Verified 2026-09-10: `bunx tsc --noEmit` clean, `bunx biome check` clean over these eleven files,
+`bunx vitest run features/product-import` 106 green, full suite 70 files / 638 tests green. The
+biome errors I left alone are the owner's stray `console.log` in `app/(app)/customers/page.tsx` and
+four formatting errors in the other agent's specs.
+
+## 10. The `columnMap` inversion, and the trap that comes with it
+
+The API answers `field -> header`; artboard `2e` draws one row per **file header** with a dropdown
+choosing the field it feeds. Both directions are exported pure functions in `column-map-step.tsx`,
+which is what let them be tested without a render:
+
+- `invertColumnMap(job)` gives `Map<header, field>`, skipping the nulls. The inverse is **total**:
+  the server refuses a merged map in which two fields claim one header, so no header is ever the
+  value of two keys and the `Map` cannot silently lose an entry.
+- `fileHeaders(job)` takes the file's own column **order** from `Object.keys(job.rows[0].raw)`.
+  That is the same place the server derives the file's real header set from
+  (`product-import.service.ts:317`), and it is the only ordered source — `columnMap` is keyed by
+  our ten fields in our order, and `unmatchedHeaders` is a leftovers list. There is a fallback for
+  a row page that came back empty under a status filter; it cannot preserve order, which is why it
+  is a fallback and not the primary path.
+- `patchForHeader(header, from, to)` builds the `PATCH` body. **Both halves always go in one
+  call** — `{ costPrice: null, sellingPrice: "Cost" }` — because the *merged* map is what the
+  server validates and `{ sellingPrice: "Cost" }` alone is refused while `costPrice` still holds
+  that header. It returns `null` when nothing would change, which is what keeps an idle `change`
+  event off the most destructive endpoint in the slice.
+
+**A consequence worth stating: this screen's own arithmetic can never produce either
+`IMPORT_UNKNOWN_HEADER` case.** The headers come from the file, and every patch clears the old
+field in the same call, so neither "not a column in this file" nor "cannot be mapped to both" is
+reachable unless the job moved underneath the page — another tab, or a stale render. Both are
+still handled and both say exactly that, but a future reader should not mistake the branch for
+dead code, nor assume it means the client miscomputed something.
+
+### A file header is not a DOM id
+
+`aria-describedby` is a **space-separated list of ids**, and a real spreadsheet heading is
+"Sales Price". Building ids out of the header produced ids containing spaces, which made the
+select's `aria-describedby` point at two ids that do not exist while `htmlFor` went on working —
+an accessibility break that renders perfectly and passes a smoke test. Ids are now `useId()` plus
+the column's index. Anything keyed by user data has the same problem.
+
+## 11. What the design asks for that the API cannot deliver
+
+| Artboard `2e` shows | The API | What shipped |
+|---|---|---|
+| a bare dashed drop zone | — | A real `<input type="file">` had to be added: the artboard draws no picker affordance at all, and a `div` with an `onClick` is unreachable by keyboard and invisible to assistive tech. It is `sr-only` — visually hidden, still focusable, still announced — with the upper block of the zone as its `<label>`, so its accessible name is the design's own words plus the size rule. "Download template" sits **outside** the label, because a button nested inside one is a click target fighting the label's own activation. |
+| "expires in 6 d" | `expiresAt`, absolute | Days round **up**. A job uploaded a day ago has 5 d 23 h left; floored that reads "5 d", which is an hour-accurate lie about which day it dies — and rounding up is how the artboard's own row gets to 6. Below 24 h the unit changes to hours, because "expires in 1 d" over thirty remaining minutes is the one rounding error that costs someone their work. No timezone is involved and none should be: it is an elapsed duration between two instants, and a calendar-day difference would move it across midnight for a reader in another zone. |
+| a date on a committed job | `committedAt`, plus the same absolute `expiresAt` | The date is drawn as designed, but the panel needed a footnote the artboard has no room for: the TTL index has no `partialFilterExpression`, so a **committed** job's `result` and `committedProductIds` die seven days after the *upload* too. Someone who reads "Committed" as "kept" comes looking for the receipt in a fortnight. |
+| nothing about who uploaded | `createdBy` stored, never mapped | Cannot be built at all. There is no member id on the wire to join against, so the filename carries the row's identity — as the accessible name of the resume button and as the row's `title` — instead of a column the design has no width for. |
+| no cancel affordance | `DELETE /:id`, 204 | Added, because a `reviewing` job otherwise sits in the list for a week with no way to stop it. It is behind a confirmation, and the copy says "stops" rather than "deletes": this is a **soft** cancel, the job stays in the list as `cancelled`, and nothing anywhere in the backend deletes an import job. |
+
+## 12. Three decisions worth the argument
+
+**`hasBeenEdited(job)` is `updatedAt > createdAt`, and that is a heuristic.** The brief asked for a
+warning before remapping "a job whose rows have been edited". Nothing on the wire says a row was
+edited — there is no flag, no revision count, and the row shaper carries neither. What does exist
+is Mongoose timestamps: both are set to the same instant at insert and every mutating service call
+bumps `updatedAt` (`service.ts:366,389,409,534`). So a later `updatedAt` means *something* was
+written, and it cannot tell a row fix from an earlier remap. It is used only to add a second
+sentence to a warning that is shown **either way** — the destruction is a property of the endpoint,
+not of how much work has been done — and never to skip one.
+
+**Columns before rows, as the wizard's default order.** `PATCH /columns` re-derives every
+non-skipped row from `raw`, so the only order in which a remap costs nothing is the one that
+settles the mapping first. Opening a job lands on step 2, not on the review table, and the way to
+step 3 is a button that says the mapping looks right.
+
+**The template download reaches the service directly, skipping the hooks layer.** A deliberate,
+documented exception to `page -> components -> hooks -> services`:
+`GET /products/import/template` answers raw `text/csv`, already bypasses the axios client (it is
+`fetch`-based in the service for exactly that reason), and produces **no server state** to key,
+cache or invalidate — only a file to hand to the browser. A `useMutation` wrapper would have been a
+query-layer object with nothing to query. Local `{ busy, error }` state instead; the failure still
+renders as an `ErrorCard` with the request id, because the service normalises it into an `ApiError`
+by hand.
+
+## 13. Small things learned
+
+- **The upload seed is actually read.** `useUploadImport` seeds `importKeys.jobPage(job.id)` with
+  the resolved defaults, and the wizard opens the job with `useImportJob(jobId)` and no params.
+  Those hash to the same key, so going from "file dropped" to "columns on screen" costs zero extra
+  requests. Passing any row filter at that call site would silently throw the seed away.
+- **A client-side extension check earns its keep here specifically.** With no `fileFilter` on the
+  endpoint, a `.pdf`, a `.txt` and a `.xls` all come back as `IMPORT_NO_ROWS` — "we could not read
+  any rows out of that file" about a file that is full of rows. The check refuses those before the
+  upload; every server refusal is still rendered, branched on `code`, with the request id kept.
+- **The 429 gets its own sentence.** `lib/api/client` already toasts it, but a toast cannot say the
+  thing that makes it surprising: the limiter is `keyBy: "organization"`, so twenty uploads are
+  spent by the whole business and a colleague's failed attempts spend yours.
+- **A 404 on `GET /:id` is written as expiry first.** It covers "no such job", "another business's
+  job" and "aged out" with one code, and the seven-day TTL makes the third the likeliest by a
+  distance — which "Import job not found" does not hint at even slightly.
+- **`role="status"` is a biome error in this repo** (`lint/a11y/useSemanticElements`); `<output>`
+  carries the role natively and is what the rest of the codebase already uses.
+- **Committed and cancelled jobs are handed to `CommitBar`**, which already renders the receipt for
+  one and a plain note for the other. The wizard contributes only the filename and the way out —
+  two components each rendering their own version of the same receipt would eventually disagree.
+
+## 14. Files
+
+```
+app/(app)/products/import/page.tsx          — requirePageAccess + ForbiddenScreen
+app/(app)/products/import/page.test.tsx
+features/product-import/components/
+  import-wizard.tsx        — the shell, the four-step rail, ?job= in the URL
+  upload-step.tsx          — drop zone, courtesy checks, template download
+  previous-jobs.tsx        — the list, the expiry label, the cancel dialog
+  column-map-step.tsx      — the inversion, the remap dialog, the refusals
+  (+ a co-located .test.tsx for each)
+```
+
+One edit outside them: `features/products/components/products-page.tsx`, where the `Import` button
+was `disabled` with `title="Coming soon"` and now links to `ROUTES.productImport`. It needed no
+gate of its own — it already sits inside the `canCreate` block, and all ten import endpoints gate
+on that same `products:create`.
+
+---
+
+# 2026-09-10 (later still) — the review and commit screens (steps 3 and 4)
+
+`features/product-import/components/` — `review-step.tsx`, `commit-bar.tsx` and the four
+supporting files they need. Written against
+`docs/findings/slice4-import-live-observations.md`, whose §1 and §2 were the whole task.
+
+Verified: `bunx tsc --noEmit` clean, `bunx biome check` clean over these files,
+`bunx vitest run features/product-import` 133 tests green across 10 files, full suite
+71 files / 646 tests green. The one repo-wide biome error is still the owner's stray
+`console.log` in `app/(app)/customers/page.tsx`; untouched.
+
+## 15. Translating the row `errors` needs `parsed`, not just the field key
+
+The observation file says to switch on the field key because the key is reliable and the message
+is not. True, and not sufficient: **one field key covers several different problems.** `name`
+alone produced both of these live —
+
+```
+name: "Invalid input: expected string, received undefined"   (row 2, blank cell)
+name: "Too big: expected string to have <=120 characters"    (row 14, 140 characters)
+```
+
+— and "Name is missing" vs "This name is too long" are not interchangeable sentences. The only
+way to tell them apart without reading the message is to read the **value**, and that turns out
+to work because of how the backend cleans a row.
+
+`cleanRow` (`../Backend/src/services/import/clean.ts:118-160`) only writes a key into `parsed`
+when the cell survived cleaning:
+
+```ts
+const name = collapse(get("name"));
+if (name) parsed.name = name;           // blank/whitespace cell -> key absent
+…
+const costRaw = get("costPrice");
+if (costRaw) {
+  const n = cleanNumber(costRaw, style);
+  if (n !== null) parsed.costPrice = n; // unparseable cell -> key absent too
+}
+```
+
+So `parsed.name === undefined` **is** the blank cell, and a present value can be measured against
+the mirrored bound. `row-message.ts` reads nothing but `field`, `parsed` and — where `columnMap`
+names the header — the reviewer's own `raw` cell. There is a test asserting the translation is
+identical when the API's prose is replaced with nonsense, because a translation that quietly
+depended on the message would pass today and mislead after a zod upgrade with nothing failing.
+
+The full mapping, for the record:
+
+| field | what decides | sentence |
+|---|---|---|
+| `name` | absent | Name is missing |
+| `name` | > 120 chars | This name is too long — 120 characters is the limit |
+| `sellingPrice` / `costPrice` | absent, cell blank | Selling price / Cost price is missing |
+| `sellingPrice` / `costPrice` | absent, cell had text | We could not read a selling price from “N/A” |
+| `sellingPrice` / `costPrice` | < 0 · > 1e12 · > 2 dp | cannot be negative · is too large · can have at most 2 decimals |
+| `quantity` | < 0 | Quantity cannot be negative |
+| `quantity` | absent / > 1e9 / > 3 dp | missing (or unreadable-from-cell) · is too large · at most 3 decimals |
+| `barcode` | < 4 · > 64 · charset | too short (4 minimum) · too long (64 limit) · only letters, numbers, dots, dashes and underscores |
+| `barcode` | value passes all three | This barcode is on more than one row of this file |
+| `category` | > 60 chars | This category name is too long — 60 characters is the limit |
+| `category` | value within bounds | This category does not exist yet, and you cannot create new categories |
+| `unit` | blank · > 20 chars | Unit is missing · This unit is too long — 20 characters is the limit |
+| `lowStockThreshold` | absent · < 0 · non-integer · > 1e9 | missing/unreadable · cannot be negative · must be a whole number · is too high |
+| `trackStock` | absent · present | We could not tell from “x” whether this item is stock-tracked — use yes or no · Track stock must be yes or no |
+| `description` | > 2000 chars | This description is too long — 2,000 characters is the limit |
+| `_` | — | We could not read this row |
+
+### The raw cell separates two problems `parsed` alone cannot
+
+`sellingPrice` absent means "the cell was blank" **or** "the cell said `N/A` and nothing numeric
+survived" — identical `parsed`, identical zod message, different sentences to a shopkeeper. The
+column map is field -> header, so `row.raw[columnMap.sellingPrice]` recovers what they typed.
+Worth noting the direction, because inverting it silently produces the vaguer sentence instead of
+failing.
+
+### Two of the eleven keys are identified by elimination, and that is deliberate
+
+`errors.barcode` has four documented causes: three zod rules (4..64, charset) and the file-level
+duplicate written by the service directly (`product-import.service.ts:152-155`). A barcode value
+that passes all three rules and is still flagged can only be the duplicate. Same shape for
+`errors.category`: over 60 characters, or the literal `"Unknown category"` the *commit* writes
+when the caller lacks `categories:create` (`service.ts:45,530-531`).
+
+This is inference, not a wire fact, and it is written down here because it is the one place in
+the mapping where a future backend change could make a sentence wrong rather than merely vague.
+Both branches are commented at the switch with their source lines.
+
+### The duplicate message reads well and is still not shown in the Message column
+
+`"Duplicated in the file (rows 6, 7)"` is the one message fit for a human — except its numbers
+are **0-based data indexes**, so those are the spreadsheet's rows 8 and 9 (§7 above, contract
+Trap 6). Putting it in the Message column would send the reviewer to the wrong two lines. So the
+column says *"This barcode is on more than one row of this file"*, the server's sentence stays in
+the expandable details and in the pill's `title`, and a line underneath it says the numbers count
+from the first data row. That line renders only when a duplicate message is actually present.
+
+## 16. What the conflict banner does about the parenthetical
+
+Observation §2: `conflict` is `{ existingProductId, existingName }` and the canvas draws
+`(USD 12.40, 3 pcs)` beside the name. Chosen: **the name always, the figures on demand.**
+`ConflictBanner` renders the name with no figures at all plus a *Compare* button; pressing it
+enables `useProduct(existingProductId)` for that one row and shows two **labelled** columns —
+"Already in your products" and "This row in your file" — with price, cost and stock on each.
+
+Two halves rather than one merged line, because the imported row's price and the live product's
+price are different numbers and the observation file is explicit that showing one where the other
+belongs defeats the purpose. A fifty-conflict file costs zero requests until someone opens a
+specific conflict. There is a test asserting the imported row's `10.50` appears nowhere in the
+collapsed banner.
+
+A resolved conflict also gets a sentence of its own: **"Decided rows stay listed as conflicts
+until the import runs, so this count will not go down."** Nothing else on the screen can convey
+that — `status` stays `"conflict"` and `counts.conflict` does not move — and silence there reads
+as a save that failed.
+
+## 17. A number already in the file cannot be un-set through `PATCH`
+
+Not in the contract and easy to ship as a silent no-op. `editRow` merges
+(`merged = { ...row.parsed, ...patch }`, `service.ts:372-394`) and `importRowPatchSchema` has no
+`null` for any field, so there is no way to *remove* a numeric value the file supplied. Emptying
+the box and saving would drop the field from the diff and look like an edit that saved nothing.
+
+`FixRowDialog` refuses it with a sentence instead. The one field that can genuinely be cleared is
+the category, via the empty string — `resolveRowCategories` deletes both `parsed.category` and
+`parsed.categoryId` when the trimmed name is falsy — and that is the only place `""` is sent.
+
+## 18. More than 200 conflicts is a realistic file, so the commit bar pages
+
+§3 above accepted `conflicts_not_loaded` as the correct answer beyond one page at the 200 cap.
+That is right as far as `commitReadiness` goes, but it leaves a real user stuck: a shop
+re-uploading its whole catalogue has one conflict per barcode it already stocks, which on a
+2,000-row file can be most of them. A Commit button disabled for ever by an answer the client
+simply had not finished fetching is worse than the failed commit the refusal exists to prevent.
+
+So `CommitBar` walks the conflict pages and accumulates them, and **the accumulator's identity is
+`job.updatedAt`**. That part is load-bearing: every row write re-reconciles the whole file, and
+any `PATCH` on a conflicted row silently discards its resolution — so a page fetched before a
+write could otherwise sit in the accumulated list claiming a decision that no longer exists,
+which is exactly the false "yes" `commitReadiness` was built to refuse. `updatedAt` moves on
+every one of those writes, so when it changes the accumulation restarts from page 1.
+
+## 19. What the design asks for that the API still cannot give
+
+Beyond the two already recorded, found while building these two screens:
+
+- **"3 conflicts resolved" is not derivable from the job at all.** The canvas puts it in the
+  step-4 summary beside `ready` and `skipped`, which *are* in `counts` — but a resolution is
+  per-row and `publicJobSummary` carries none. The bar renders `… of 3 conflicts resolved` with
+  an ellipsis while the conflict rows load: "the summary can prove a no but never a yes" showing
+  up in the copy rather than only in the button state.
+- **"Import 184 products" understates a commit that has `update` resolutions.** `counts.ready` is
+  the create count; rows resolved `"update"` also write, and no single tally covers both. The
+  button keeps the canvas's number and a muted line above it says how many rows will change a
+  product already stocked.
+- **The Message column is one pill and a row can have several messages.** A row can carry several
+  `errors` keys *and* notes at once. The first message is the pill; the rest are behind a
+  `+N more` toggle that expands a full-width row — which is also where the raw messages live.
+- **The canvas draws no per-row actions.** A reviewer has to be able to fix and skip a row from
+  the list, and the only buttons drawn are the conflict banner's. An eighth column was added.
+- **No "Ready" badge.** The canvas gives every row a message pill; a table where every good row
+  says "Ready" cannot be scanned for the bad ones, so a clean `ready` row shows an em dash.
+
+## 20. Small decisions
+
+| Decision | Why |
+|---|---|
+| A real `<table>` rather than `components/shared/data-table` | The conflict banner and the message details are rows that **span every column**, which a column-per-cell renderer cannot express. A grid of `div`s could, but the one screen whose whole subject is "which line of my spreadsheet is wrong" is the last place to throw away row and column semantics. |
+| The message pill carries `data-tone="problem" \| "note"` | "A note must never be styled as a fault" is a rule whose only evidence is a class string, and class strings are exactly what a refactor breaks silently. The tone is now an attribute a test holds on to. |
+| Row filters in the URL, keyed `rowStatus` / `rowPage` / `rowLimit` | Repo convention, plus the wizard shell around this owns the query string too — a bare `page` would collide with the jobs list beside it. |
+| The page-size selector offers 200 | It is the only place in the app where the cap is not 100, and offering it is what makes the difference real rather than a constant nobody exercises. |
+| Restoring a skipped row sends `{ unit }` and nothing else | There is no un-skip endpoint (Trap 9). `parsed.unit` is the one field `cleanRow` always sets — it defaults to `"pcs"` — so it is a guaranteed-present no-op write that still triggers the re-validation which revives the row. Echoing `unit`, `trackStock` and `quantity` together, as the stale Trap 1 advises, would write two fields nobody touched. |
+| `FixRowDialog` renders all ten fields, not just the broken ones | The problems are listed at the top in plain language and the offending fields are marked, but a reviewer fixing a price often wants to correct the name in the same pass, and a dialog that hides the rest forces a second round trip. |
+| The dialog re-reads its row out of the freshly fetched page | A file-wide reconciliation can move a row between the click and the render, and diffing against a stale `parsed` sends a patch against values the server no longer holds. |
+
+## 21. Files
+
+```
+features/product-import/components/
+  row-message.ts              — the translator, plus `importFieldLabel`
+  row-message.test.ts         — tested against the five strings observed live
+  review-step.tsx             — step 3: tabs, table, paging, dialogs
+  import-rows-table.tsx       — the seven-column table + full-width rows
+  conflict-banner.tsx         — the conflict row and its compare-on-demand
+  fix-row-dialog.tsx          — PATCH one row, diff only
+  commit-bar.tsx              — step 4, and `blockerText`
+  *.test.tsx                  — one per component
+```
+
+Nothing outside `features/product-import/components/` was changed.
