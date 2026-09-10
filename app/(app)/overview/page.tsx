@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
 import { OverviewScreen } from "@/features/dashboard/components/overview";
+import { requirePageAccess } from "@/lib/auth/require-page-access";
 
 export const metadata: Metadata = {
   title: "Overview",
@@ -13,6 +15,12 @@ export const metadata: Metadata = {
  * boundary starts at `OverviewScreen` rather than here — a `"use client"` on a
  * page drags its entire subtree into the bundle for no gain.
  */
-export default function OverviewPage() {
+export default async function OverviewPage() {
+  // Server-side, on EVERY request for this page — including a client-side
+  // navigation, which does not re-run the layout (Next: layouts "do not
+  // re-render on navigation"). See `lib/auth/require-page-access.ts`.
+  const { permitted } = await requirePageAccess();
+  if (!permitted) return <ForbiddenScreen />;
+
   return <OverviewScreen />;
 }

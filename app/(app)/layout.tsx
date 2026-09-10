@@ -38,15 +38,25 @@ import { getQueryClient } from "@/lib/query/client";
  * the moment one of them is put behind an auth check. `app/(app)/layout.test.tsx`
  * asserts where each of the five lives rather than trusting this comment.
  *
- * **The two client guards below are NOT redundant and must not be deleted as
- * duplicates.** This function runs once, on the server, for the request that
- * entered the segment. It does not run again for a client-side navigation
- * within the shell, and it cannot notice a session that expires while someone
- * is sitting on a page. `AppGate` and `RouteGuard` cover exactly those two
- * gaps, live, off the same `GET /auth/me` this layout just made — which is
- * why the result is seeded into the React Query cache below instead of being
- * fetched a second time on mount. Server-first, client-continuous: neither
- * half covers the other's case.
+ * **This layout is not the whole gate, and must not be treated as it.** It
+ * runs for the request that entered the segment and then does not run again:
+ * Next's docs are explicit that layouts "preserve state, remain interactive,
+ * and do not re-render on navigation", and that the router serves cached
+ * layouts during a client-side navigation "without a server request". So a
+ * layout-only check validates the session once per full page load and never
+ * again for the rest of that browsing session. **Every page under this layout
+ * therefore awaits `requirePageAccess()` as well** (`lib/auth/require-page-access.ts`),
+ * which is the call that runs on every navigation, and a test walks this
+ * directory so a page added later cannot quietly skip it. `readServerSession`
+ * is wrapped in React's `cache()`, so a full load still pays for exactly one
+ * `GET /auth/me` across the two.
+ *
+ * **The two client guards below are NOT redundant either.** They cover the one
+ * thing no server check can: a session that is revoked while someone is
+ * sitting on a page they already have, with no navigation to trigger a new
+ * request. They run off the same `GET /auth/me` this layout just made — which
+ * is why the result is seeded into the React Query cache below rather than
+ * fetched again on mount.
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const path = await readRequestPath();

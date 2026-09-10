@@ -1,8 +1,10 @@
 import { ChevronLeft } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
 import { ROUTES } from "@/config/routes";
 import { ProductForm } from "@/features/products/components/product-form";
+import { requirePageAccess } from "@/lib/auth/require-page-access";
 
 export const metadata: Metadata = {
   title: "New product",
@@ -17,7 +19,13 @@ export const metadata: Metadata = {
  * `RouteGuard` in `app/(app)/layout.tsx` enforces it, which is stricter than
  * the `/products` parent for exactly this page.
  */
-export default function NewProduct() {
+export default async function NewProduct() {
+  // Server-side, on EVERY request for this page — including a client-side
+  // navigation, which does not re-run the layout (Next: layouts "do not
+  // re-render on navigation"). See `lib/auth/require-page-access.ts`.
+  const { permitted } = await requirePageAccess();
+  if (!permitted) return <ForbiddenScreen />;
+
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-2">

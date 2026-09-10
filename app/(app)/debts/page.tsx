@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
 import { DebtsPage } from "@/features/debts/components/debts-page";
+import { requirePageAccess } from "@/lib/auth/require-page-access";
 
 export const metadata: Metadata = {
   title: "Debts",
@@ -17,6 +19,12 @@ export const metadata: Metadata = {
  * needed adding there for this page to appear in the sidebar; `/debts/<id>`
  * inherits that row by longest-prefix match.
  */
-export default function Debts() {
+export default async function Debts() {
+  // Server-side, on EVERY request for this page — including a client-side
+  // navigation, which does not re-run the layout (Next: layouts "do not
+  // re-render on navigation"). See `lib/auth/require-page-access.ts`.
+  const { permitted } = await requirePageAccess();
+  if (!permitted) return <ForbiddenScreen />;
+
   return <DebtsPage />;
 }

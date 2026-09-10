@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
 import { Counter } from "@/features/sales/components/counter/counter";
+import { requirePageAccess } from "@/lib/auth/require-page-access";
 
 export const metadata: Metadata = {
   title: "New sale",
@@ -19,6 +21,12 @@ export const metadata: Metadata = {
  * its submit on the same permission as well, for the role that loses it
  * mid-shift.
  */
-export default function NewSale() {
+export default async function NewSale() {
+  // Server-side, on EVERY request for this page — including a client-side
+  // navigation, which does not re-run the layout (Next: layouts "do not
+  // re-render on navigation"). See `lib/auth/require-page-access.ts`.
+  const { permitted } = await requirePageAccess();
+  if (!permitted) return <ForbiddenScreen />;
+
   return <Counter />;
 }

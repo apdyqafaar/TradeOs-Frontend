@@ -215,3 +215,52 @@ shared between concurrent users.
 
 Only the session cookie is forwarded, not the whole jar: the rest of the browser's cookies are none
 of the API's business.
+
+---
+
+## 2026-09-10 — the layout was not enough, and the owner was right about why
+
+**What:** the server-side gate lived only in `app/(app)/layout.tsx`. The owner pushed back that
+every protected *page* must be checked, not just the layout. That is correct, and the reason is in
+Next's own documentation rather than in anything about this codebase.
+
+**Evidence**, from `node_modules/next/dist/docs/`:
+
+- `01-app/04-glossary.md:117` — "Layouts preserve state, remain interactive, and **do not
+  re-render on navigation**."
+- `01-app/04-glossary.md:47` — the Router Cache "stores RSC Payload for visited and prefetched
+  routes. During client-side navigation, Next.js serves **cached layouts** ... **without a server
+  request**. **Pages are not cached by default.**"
+- `01-app/01-getting-started/03-layouts-and-pages.md:43` — same statement again.
+
+**So what:** a layout-only gate validates the session on a full page load and then never again for
+the rest of that browsing session. Signing in and then moving `/overview → /products → /debts`
+inside the shell issues no further server-side session check — pages keep rendering on the server
+for a session that may since have been revoked (signed out elsewhere, removed from the business,
+role changed, banned), until some client query happens to 401. Pages, by contrast, *are* re-fetched
+per navigation, so a per-page call runs every time.
+
+**Fixed:** `lib/auth/require-page-access.ts`, awaited by all twelve pages under `app/(app)/`.
+`readServerSession` is now wrapped in React's `cache()`, so a full load pays for one `/auth/me`
+across layout and page rather than two, while a later navigation — a separate request — pays for
+its own, which is the entire point.
+
+A missing permission still returns a flag rather than redirecting, so the page renders
+`<ForbiddenScreen />` and the member keeps the shell. That rule is unchanged.
+
+**Verified against the running server**, not only in tests. A client-side navigation is an RSC
+request; reproduced with curl:
+
+| Request | Result |
+|---|---|
+| `/products?_rsc=…` + `RSC: 1`, valid session | 200, payload renders `Products` and `Sidebar` |
+| same, **forged** cookie | 200, payload carries `REDIRECT` ×4 and `login` ×2, **no sidebar, no page content, no product data** |
+
+**Also pinned:** a test walks `app/(app)` and fails naming any `page.tsx` that does not call the
+guard — break-tested by stripping it from `/sales`, which turned that test red with the file named.
+Without it, an unguarded page added later would look fine (the layout still covers a full load) and
+only be reachable-unprotected by navigating to it from inside the shell.
+
+**Removed while here:** `app/(app)/layout.tsx` carried a leftover
+`console.log("AppLayout session:", session)` that printed the whole session — email, permissions,
+organization — to the server log on every request.

@@ -1,8 +1,10 @@
 import { ChevronLeft } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
 import { ROUTES } from "@/config/routes";
 import { DebtForm } from "@/features/debts/components/debt-form";
+import { requirePageAccess } from "@/lib/auth/require-page-access";
 
 export const metadata: Metadata = {
   title: "New debt",
@@ -29,7 +31,13 @@ export const metadata: Metadata = {
  * `resolveRoutePermission` agrees by a different rule — longest guarded prefix
  * on a `/` boundary — so the two never disagree about which page this is.
  */
-export default function NewDebt() {
+export default async function NewDebt() {
+  // Server-side, on EVERY request for this page — including a client-side
+  // navigation, which does not re-run the layout (Next: layouts "do not
+  // re-render on navigation"). See `lib/auth/require-page-access.ts`.
+  const { permitted } = await requirePageAccess();
+  if (!permitted) return <ForbiddenScreen />;
+
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-2">

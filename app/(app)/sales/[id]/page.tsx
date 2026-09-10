@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
 import { Receipt } from "@/features/sales/components/receipt";
+import { requirePageAccess } from "@/lib/auth/require-page-access";
 
 export const metadata: Metadata = {
   title: "Receipt",
@@ -30,6 +32,12 @@ export default async function SalePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  // Server-side, on EVERY request for this page — including a client-side
+  // navigation, which does not re-run the layout (Next: layouts "do not
+  // re-render on navigation"). See `lib/auth/require-page-access.ts`.
+  const { permitted } = await requirePageAccess();
+  if (!permitted) return <ForbiddenScreen />;
+
   const { id } = await params;
 
   return <Receipt saleId={id} />;

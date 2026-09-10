@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
 import { SalesPage } from "@/features/sales/components/sales-page";
+import { requirePageAccess } from "@/lib/auth/require-page-access";
 
 export const metadata: Metadata = {
   title: "Sales",
@@ -15,6 +17,12 @@ export const metadata: Metadata = {
  * `/sales` is already in `config/routes.ts` gated on `sales:view`, so nothing
  * needed adding there for this page to appear in the sidebar.
  */
-export default function Sales() {
+export default async function Sales() {
+  // Server-side, on EVERY request for this page — including a client-side
+  // navigation, which does not re-run the layout (Next: layouts "do not
+  // re-render on navigation"). See `lib/auth/require-page-access.ts`.
+  const { permitted } = await requirePageAccess();
+  if (!permitted) return <ForbiddenScreen />;
+
   return <SalesPage />;
 }

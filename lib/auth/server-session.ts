@@ -1,4 +1,5 @@
 import { cookies, headers } from "next/headers";
+import { cache } from "react";
 import { serverEnv } from "@/config/env";
 import { ROUTES } from "@/config/routes";
 import type { SessionData } from "@/features/auth/services/auth.service";
@@ -94,37 +95,50 @@ function toSessionData(body: unknown): SessionData | null {
  * The one thing the caller must not do is wrap this in a `try`: it never
  * throws, and `redirect()` — which the caller calls on `null` — throws by
  * design to unwind the tree.
+ *
+ * **Wrapped in React's `cache()`, which is what makes calling it twice free.**
+ * The layout checks, and so does every page (see `require-page-access.ts`),
+ * because a layout does not re-run on a client-side navigation — the Next docs
+ * are explicit that "layouts preserve state, remain interactive, and do not
+ * re-render on navigation", and that the router serves cached layouts "without
+ * a server request". Pages are not cached that way, so the per-page call is
+ * the one that runs every time. `cache()` scopes the result to a single server
+ * request, so a full page load pays for one `/auth/me` and not two, while a
+ * later navigation — a fresh request — pays for its own, which is the whole
+ * point.
  */
-export async function readServerSession(): Promise<SessionData | null> {
-  const cookieStore = await cookies();
-  const session = cookieStore.get(serverEnv.sessionCookieName);
-  // No cookie at all: nothing to ask the API about, so do not ask it.
-  if (!session?.value) return null;
+export const readServerSession = cache(
+  async (): Promise<SessionData | null> => {
+    const cookieStore = await cookies();
+    const session = cookieStore.get(serverEnv.sessionCookieName);
+    // No cookie at all: nothing to ask the API about, so do not ask it.
+    if (!session?.value) return null;
 
-  try {
-    const response = await fetch(`${serverEnv.apiOrigin}/api/v1/auth/me`, {
-      headers: {
-        // Only the session cookie is forwarded. The rest of this browser's
-        // jar (theme, analytics, another app on the domain) is none of the
-        // API's business and would widen what a compromised backend can see.
-        cookie: `${session.name}=${session.value}`,
-        accept: "application/json",
-      },
-      // Per-request, per-user auth. Anything cached here is one user's
-      // identity answered to the next one; `no-store` is not an optimisation
-      // choice, it is the correctness requirement.
-      cache: "no-store",
-      // A backend that accepts the connection and then never answers would
-      // otherwise hang the render for as long as the platform allows. Failing
-      // closed after ten seconds is a redirect to /login; not failing is a
-      // page that never paints.
-      signal: AbortSignal.timeout(10_000),
-    });
+    try {
+      const response = await fetch(`${serverEnv.apiOrigin}/api/v1/auth/me`, {
+        headers: {
+          // Only the session cookie is forwarded. The rest of this browser's
+          // jar (theme, analytics, another app on the domain) is none of the
+          // API's business and would widen what a compromised backend can see.
+          cookie: `${session.name}=${session.value}`,
+          accept: "application/json",
+        },
+        // Per-request, per-user auth. Anything cached here is one user's
+        // identity answered to the next one; `no-store` is not an optimisation
+        // choice, it is the correctness requirement.
+        cache: "no-store",
+        // A backend that accepts the connection and then never answers would
+        // otherwise hang the render for as long as the platform allows. Failing
+        // closed after ten seconds is a redirect to /login; not failing is a
+        // page that never paints.
+        signal: AbortSignal.timeout(10_000),
+      });
 
-    if (!response.ok) return null;
-    return toSessionData(await response.json());
-  } catch {
-    // Unreachable, aborted, or a body that is not JSON. Fail closed.
-    return null;
-  }
-}
+      if (!response.ok) return null;
+      return toSessionData(await response.json());
+    } catch {
+      // Unreachable, aborted, or a body that is not JSON. Fail closed.
+      return null;
+    }
+  },
+);
