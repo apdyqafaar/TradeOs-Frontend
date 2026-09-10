@@ -170,6 +170,30 @@ All verified against backend source and then against a live server:
 
 ## 3. Security and risk
 
+### The public page's rate limit is now shared by every reader of every link
+**Found 2026-09-10 while building the projects slice. Needs a backend or infra change.**
+`GET /public/projects/:token` is rate limited at **60 requests per minute keyed on `req.ip`**.
+That is a sensible per-visitor budget when the visitor's browser calls the API directly. It is not
+what happens here: the public page is rendered **server-side**, so the API sees the **Next server's
+IP** for every reader of every business's link. The 60/minute is therefore a **product-wide** budget,
+not a per-visitor one, and one business sharing a link widely can exhaust it for everybody.
+
+The frontend mitigates only the cheap part — a token that fails a local shape check never becomes a
+request. The real fix belongs behind the frontend: key the limit on the forwarded client IP
+(`X-Forwarded-For`), or exempt the server-side renderer, or raise the ceiling knowing what it now
+means. Worth deciding before the first client link is shared at any volume.
+
+### Public project dates are rendered in UTC, because the payload has no timezone
+**Found 2026-09-10. One backend field would fix it.** Every in-app screen renders dates in the
+business's own timezone, taken from the session. The public page has no session, and the public
+payload carries `startDate`, `dueDate`, `updatedAt` and each update's `createdAt` with **no
+timezone anywhere in it**. So the client-facing page reads them in UTC.
+
+Uniform for every reader, which is the least-bad default, but for a business east of Greenwich a
+date can land a day early — a project "due 21 Sep" showing as 20 Sep to the customer it was shared
+with. Adding the organization's timezone to the public payload is the whole fix.
+
+
 ### The public project page: three things that outlive an unpublish
 **Found 2026-09-10 while extracting the projects contract. Backend, not frontend.**
 `GET /public/projects/:token` is the only unauthenticated business route, and its payload is
