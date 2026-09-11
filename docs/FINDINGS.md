@@ -325,6 +325,32 @@ link. Making either guest-only breaks a supported flow.
 
 ## 4. Operational gotchas
 
+- **Opening the dev server from a phone needs `allowedDevOrigins`, or the page reload-loops.**
+  `next dev` is initialised with the hostname `localhost` and refuses cross-origin requests to
+  dev-only resources — anything under `/_next` or `/__nextjs`
+  (`next/dist/server/lib/router-utils/block-cross-site-dev.js`). The symptom is not an error page:
+  ordinary asset and RSC requests from the phone are *same-origin*, so they carry no `Origin`
+  header and pass, and the screen looks correct. **The HMR WebSocket is the exception** — a
+  handshake always sends `Origin` and its endpoint is under `/_next`, so it is answered `403
+  Unauthorized`, and the dev client reloads the page to recover from what it reads as a dropped
+  connection. On the login screen that lands mid-typing and presents as "it refreshes when I try to
+  log in". Fixed by `allowedDevOrigins: ["192.168.1.*"]` in `next.config.ts`; a `/24` rather than
+  one address because the machine's IP is DHCP and pinning it fails silently on the next lease.
+  Matching is per dot-separated segment (`next/dist/server/app-render/csrf-protection.js`), so that
+  pattern covers that subnet and nothing wider. Editing `next.config.ts` restarts the dev server by
+  itself — no manual restart. Break-tested: pointing the allowlist at `10.0.0.*` returns the LAN
+  origin to 403.
+- **A phone on a `http://192.168.x.x` address has no camera, and that is the browser, not us.**
+  `getUserMedia` is exposed only in a secure context, so the barcode scanner button correctly hides
+  itself there (`cameraSupport()` answers `insecure-context`). Everything else works over plain
+  HTTP. **This is a dev-only problem and not a product limit**: in production the app is served
+  over HTTPS, which is a secure context, so phone scanning works — iPhone included, since the ZXing
+  fallback covers Safari's missing `BarcodeDetector`, and the `<video>` already carries `muted` and
+  `playsInline` for iOS's autoplay policy. To test it on a real phone before then, cheapest first:
+  a tunnel (cloudflared/ngrok) gives a public HTTPS URL and needs nothing installed on the phone;
+  `next dev --experimental-https` works but the phone will not trust the cert until mkcert's CA is
+  installed there too; Android Chrome can whitelist the origin under
+  `chrome://flags/#unsafely-treat-insecure-origin-as-secure`.
 - **Next 16 allows exactly one dev server per project directory, whatever the port.** A second
   `next dev` in this repo fails outright with a `taskkill` suggestion. This blocks parallel agents
   from each running one.

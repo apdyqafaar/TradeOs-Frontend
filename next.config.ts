@@ -13,6 +13,37 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
 
   /**
+   * Lets a phone on the shop's WiFi open `http://192.168.1.x:3000` without the
+   * page reloading itself every few seconds.
+   *
+   * `next dev` is initialised with the hostname `localhost`, and Next refuses
+   * cross-origin requests to its **dev-only** resources — anything under
+   * `/_next` or `/__nextjs` — from any other host
+   * (`next/dist/server/lib/router-utils/block-cross-site-dev.js`). Reaching the
+   * server by LAN address makes every such request come from
+   * `192.168.1.x:3000`, which is not `localhost`.
+   *
+   * Most of the page survives that, which is what makes it confusing to
+   * diagnose: ordinary asset and RSC requests from the phone are *same-origin*,
+   * so the browser sends no `Origin` header and the check lets them through.
+   * **The HMR WebSocket is the exception.** A WebSocket handshake always sends
+   * `Origin`, and its endpoint is under `/_next`, so it is answered `403
+   * Unauthorized`; the dev client then treats the dead socket as a lost
+   * connection and reloads the page to recover, over and over. On the login
+   * screen that lands mid-typing and reads as "it refreshes when I try to log
+   * in".
+   *
+   * A `/24` wildcard rather than one address because the machine's IP comes
+   * from DHCP and changes; pinning it would fail silently the next time the
+   * router hands out a different lease. Matching is per dot-separated segment,
+   * so `192.168.1.*` covers exactly that subnet and nothing wider
+   * (`next/dist/server/app-render/csrf-protection.js`). `localhost` is always
+   * allowed and is not affected by this. Development only — `next build` and
+   * `next start` never read it.
+   */
+  allowedDevOrigins: ["192.168.1.*"],
+
+  /**
    * The browser must call the API on this origin, never on the Express origin
    * directly. Three reasons, all of them the session cookie:
    *   - The cookie is HttpOnly and set for the API's host; a cross-origin fetch
