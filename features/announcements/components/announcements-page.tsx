@@ -1,10 +1,16 @@
 "use client";
 
 import { cn } from "cn";
-import { ChevronLeft, ChevronRight, Megaphone, Plus } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Megaphone,
+  Plus,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { parseAsInteger, useQueryStates } from "nuqs";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorCard } from "@/components/shared/error-card";
 import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
@@ -13,10 +19,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ROUTES } from "@/config/routes";
 import { useCan } from "@/features/auth/hooks/use-permission";
 import { useOrganization } from "@/features/organization/hooks/use-organization";
+import type { ApiError } from "@/lib/api/errors";
 import { PERMISSIONS } from "@/lib/auth/permissions";
+import {
+  useMarkAllAnnouncementsRead,
+  useUnreadAnnouncementCount,
+} from "../hooks/use-announcement-unread";
 import { useAnnouncements } from "../hooks/use-announcements";
-import { AnnouncementCard } from "./announcement-card";
+import { groupAnnouncements } from "../lib/group-announcements";
 import { AnnouncementFormSheet } from "./announcement-form-sheet";
+import { AnnouncementRow } from "./announcement-row";
 
 /**
  * The whole URL state of this screen, and it is one key.
@@ -28,6 +40,10 @@ import { AnnouncementFormSheet } from "./announcement-form-sheet";
  * client-side filter over one page of twenty would confidently lie about the
  * nineteen pages it cannot see.
  *
+ * The same rule rules out an "Unread only" toggle, which the 2026-09-10
+ * redesign wanted and could not have: read state is three aggregate endpoints
+ * and no query parameter.
+ *
  * `limit` is left off the URL too. Nothing on screen could change it, and a
  * URL-only knob that silently resizes the feed is a worse answer than a fixed
  * page — the server's default of 20 is what this asks for by omission.
@@ -37,11 +53,11 @@ import { AnnouncementFormSheet } from "./announcement-form-sheet";
  */
 const FILTER_PARSERS = { page: parseAsInteger.withDefault(1) };
 
-/** How many card skeletons to draw. The artboard shows three. */
-const SKELETON_COUNT = 3;
+/** How many row skeletons to draw. */
+const SKELETON_COUNT = 4;
 
 /**
- * The announcements feed — artboard `2m`, the left panel.
+ * The announcements feed.
  *
  * **This is the one list screen every member can open.**
  * `announcements:view` is held by all three presets — Owner by wildcard,
@@ -49,6 +65,27 @@ const SKELETON_COUNT = 3;
  * `lib/permissions.ts:133` (contract §5) — which is why `/announcements` has
  * no row in `ROUTE_PERMISSIONS` and why the gating here is entirely on the
  * *controls*, not on the page.
+ *
+ * ## What the 2026-09-10 redesign changed, and why
+ *
+ * It was a vertical stack of bordered cards, each opening with a full-bleed
+ * 16:9 cover. Five notices were five hero images; the titles, which are what
+ * anybody came for, were the smallest thing on screen and the page read as a
+ * wireframe of a blog rather than as the place a shop puts its notices.
+ *
+ * - **Time groups.** Pinned above everything — which is the server's own sort
+ *   made legible, not a client-side re-order — then Today / Yesterday / Earlier
+ *   this week / Earlier. A feed with no dates on it is a pile; the headings are
+ *   what turn twenty rows into "three things happened today".
+ * - **One surface per group**, hairline-separated rows, instead of a card per
+ *   notice. The same idiom the Overview's panels and the reports' breakdown
+ *   lists already use.
+ * - **The cover became an 88×60 thumbnail beside the text**, so the image
+ *   supports the notice instead of announcing it, and every title in the feed
+ *   starts on the same line whether or not one exists.
+ * - **The metadata receded** a step in the palette and moved below the excerpt.
+ *
+ * ## The states
  *
  * Every list state brief §8.4 asks for is handled: a loading skeleton, an empty
  * state, an error card carrying the request id, and a 403. There is
@@ -64,7 +101,9 @@ const SKELETON_COUNT = 3;
  *
  * **The order is the server's and cannot be changed**: pinned first, then
  * newest, applied *before* pagination. So pins occupy the head of page 1 and
- * push older notices onto page 2, with no cap on how many may be pinned.
+ * push older notices onto page 2, with no cap on how many may be pinned — which
+ * is exactly why the Pinned group can hold a notice from March while "Today"
+ * sits below it.
  */
 export function AnnouncementsPage() {
   const router = useRouter();
@@ -76,12 +115,13 @@ export function AnnouncementsPage() {
   const [composing, setComposing] = useState(false);
 
   /*
-   * Only the timezone, and it has no safe default. Every card carries a
-   * relative timestamp resolved in the *business's* day — a notice posted at
-   * 23:30 in Nairobi is "2 h ago" to the shop whoever is reading it — so the
-   * cards are held back until it lands rather than rendered against the "UTC"
-   * fallback, which is a real zone and would therefore look correct while being
-   * wrong.
+   * Only the timezone, and it has no safe default. Every row carries a
+   * relative timestamp resolved in the *business's* day, and every group
+   * heading is a calendar day in that same zone — a notice posted at 23:30 in
+   * Nairobi is "Yesterday" to the shop at 00:10, whoever is reading it. So the
+   * feed is held back until the zone lands rather than grouped against the
+   * "UTC" fallback, which is a real zone and would therefore look correct
+   * while putting rows under the wrong heading.
    *
    * No currency: there is no money anywhere on this screen.
    */
@@ -89,6 +129,10 @@ export function AnnouncementsPage() {
 
   const { data, error, isPending, isPlaceholderData, refetch } =
     useAnnouncements({ page });
+
+  const { data: unreadCount } = useUnreadAnnouncementCount();
+  const markAllRead = useMarkAllAnnouncementsRead();
+  const [markAllIssue, setMarkAllIssue] = useState<string | null>(null);
 
   // A 403 is not a failure to retry: nothing broke, the caller simply may not
   // read this. It should be unreachable — every preset holds
@@ -99,40 +143,101 @@ export function AnnouncementsPage() {
   const items = data?.items ?? [];
   const meta = data?.meta;
   const loading = isPending || organizationLoading;
+  const groups = groupAnnouncements(items, timezone);
+  const unread = unreadCount ?? 0;
+
+  const onMarkAllRead = () => {
+    setMarkAllIssue(null);
+    markAllRead.mutate(undefined, {
+      // At the control that caused it (brief §8.4), not in a toast.
+      onError: (failure: ApiError) => setMarkAllIssue(failure.message),
+    });
+  };
 
   return (
-    <div className="flex flex-col gap-5">
-      <header className="flex flex-wrap items-end justify-between gap-6">
-        <div className="flex items-baseline gap-3">
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div className="flex flex-col gap-1.5">
           <h1 className="font-serif text-[32px] text-foreground leading-[1.1]">
             Announcements
           </h1>
-          {meta ? (
-            <span className="font-mono text-[13px] text-muted-foreground">
-              {meta.total === 1 ? "1 notice" : `${meta.total} notices`}
-            </span>
-          ) : null}
+          <p className="flex flex-wrap items-center gap-2">
+            {meta ? (
+              <span className="font-mono text-[13px] text-muted-foreground">
+                {meta.total === 1 ? "1 notice" : `${meta.total} notices`}
+              </span>
+            ) : null}
+            {/*
+              The count is the *member's own* and is org-scoped server-side, so
+              it is the same number the sidebar badge shows and there is no way
+              for the two to disagree: they are one query.
+            */}
+            {unread > 0 ? (
+              <>
+                {meta ? (
+                  <span
+                    aria-hidden="true"
+                    className="font-mono text-[13px] text-muted-3"
+                  >
+                    ·
+                  </span>
+                ) : null}
+                <span className="font-mono text-[13px] text-primary">
+                  {unread === 1 ? "1 unread" : `${unread} unread`}
+                </span>
+              </>
+            ) : null}
+          </p>
         </div>
 
-        {/*
-          Hidden, never disabled (brief §1.1). The Seller preset holds
-          `announcements:view` but not `announcements:create`, and a seller does
-          not need to learn that posting a notice is a thing this product does.
+        <div className="flex flex-wrap items-center gap-2">
+          {/*
+            Only when there is something to mark. A control that is present but
+            does nothing teaches people to ignore it, and this one has no
+            useful disabled state — "you have read everything" is better said
+            by the control's absence than by a greyed-out button.
+          */}
+          {unread > 0 ? (
+            <Button
+              variant="outline"
+              className="h-10 rounded-[10px] px-3.5 text-[13px]"
+              disabled={markAllRead.isPending}
+              onClick={onMarkAllRead}
+            >
+              <Check className="size-4" aria-hidden="true" />
+              Mark all as read
+            </Button>
+          ) : null}
 
-          `useCan` rather than `<PermissionGate>` because that component renders
-          nothing while the session loads, which would pop the button in after
-          the heading has settled.
-        */}
-        {canCreate ? (
-          <Button
-            className="h-10 rounded-[10px] px-4 text-[13px]"
-            onClick={() => setComposing(true)}
-          >
-            <Plus className="size-4" aria-hidden="true" />
-            New announcement
-          </Button>
-        ) : null}
+          {/*
+            Hidden, never disabled (brief §1.1). The Seller preset holds
+            `announcements:view` but not `announcements:create`, and a seller does
+            not need to learn that posting a notice is a thing this product does.
+
+            `useCan` rather than `<PermissionGate>` because that component renders
+            nothing while the session loads, which would pop the button in after
+            the heading has settled.
+          */}
+          {canCreate ? (
+            <Button
+              className="h-10 rounded-[10px] px-4 text-[13px]"
+              onClick={() => setComposing(true)}
+            >
+              <Plus className="size-4" aria-hidden="true" />
+              New announcement
+            </Button>
+          ) : null}
+        </div>
       </header>
+
+      {markAllIssue ? (
+        <p
+          role="alert"
+          className="rounded-[10px] border border-destructive/40 bg-destructive-soft px-3.5 py-2.5 text-[13px] text-destructive-strong"
+        >
+          {markAllIssue}
+        </p>
+      ) : null}
 
       {error ? (
         <ErrorCard
@@ -151,62 +256,67 @@ export function AnnouncementsPage() {
         notice they were told to read.
       */}
       {error && !data ? null : loading ? (
-        <div className="flex flex-col gap-4">
-          {Array.from({ length: SKELETON_COUNT }, (_, index) => (
-            <Skeleton
-              // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length placeholder cards with no identity of their own, never reordered
-              key={index}
-              className="h-[188px] w-full rounded-[10px]"
-            />
-          ))}
-        </div>
+        <FeedSkeleton />
       ) : items.length === 0 ? (
         page > 1 ? (
-          <EmptyState
-            title="Nothing on this page"
-            description="Announcements were removed while this page was open."
-            icon={Megaphone}
-            action={
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void setFilters({ page: 1 })}
-              >
-                Back to the newest
-              </Button>
-            }
-          />
-        ) : (
-          <EmptyState
-            title="No announcements yet"
-            description="Shift changes, stock takes, price updates — anything the whole business needs to know lands here."
-            icon={Megaphone}
-            action={
-              canCreate ? (
-                <Button onClick={() => setComposing(true)}>
-                  <Plus className="size-4" aria-hidden="true" />
-                  New announcement
+          <EmptyPanel>
+            <EmptyState
+              title="Nothing on this page"
+              description="Announcements were removed while this page was open."
+              icon={Megaphone}
+              action={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void setFilters({ page: 1 })}
+                >
+                  Back to the newest
                 </Button>
-              ) : undefined
-            }
-          />
+              }
+            />
+          </EmptyPanel>
+        ) : (
+          <EmptyPanel>
+            <EmptyState
+              title="No announcements yet"
+              description="Shift changes, stock takes, price updates — anything the whole business needs to know lands here, newest first, with the important ones pinned to the top."
+              icon={Megaphone}
+              action={
+                canCreate ? (
+                  <Button onClick={() => setComposing(true)}>
+                    <Plus className="size-4" aria-hidden="true" />
+                    New announcement
+                  </Button>
+                ) : undefined
+              }
+            />
+          </EmptyPanel>
         )
       ) : (
         <div
           className={cn(
-            "flex flex-col gap-4 transition-opacity",
+            "flex flex-col gap-6 transition-opacity",
             // Stale rows stay on screen while the next page loads, dimmed
             // rather than blanked — `keepPreviousData` in the hook is what
             // makes that possible.
             isPlaceholderData && "opacity-60",
           )}
         >
-          {items.map((announcement) => (
-            <AnnouncementCard
-              key={announcement.id}
-              announcement={announcement}
-              timezone={timezone}
-            />
+          {groups.map((group) => (
+            <section key={group.key} className="flex flex-col gap-2">
+              <h2 className="px-1 font-medium font-mono text-[11px] text-muted-2 uppercase tracking-[0.08em]">
+                {group.label}
+              </h2>
+              <ul className="overflow-hidden rounded-[10px] border border-border bg-card">
+                {group.items.map((announcement) => (
+                  <AnnouncementRow
+                    key={announcement.id}
+                    announcement={announcement}
+                    timezone={timezone}
+                  />
+                ))}
+              </ul>
+            </section>
           ))}
         </div>
       )}
@@ -257,6 +367,62 @@ export function AnnouncementsPage() {
           }
         />
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * The empty feed, given a shape rather than left as text floating on the page
+ * ground.
+ *
+ * **Dashed, not solid.** `EmptyState`'s own docblock argues that a bordered
+ * card reads as an error, and it is right about a solid one — but a feed that
+ * has never had a row in it still needs to look like the place rows will
+ * appear. A dashed outline is the difference between "something is wrong here"
+ * and "nothing here yet", and it is the same vocabulary the reports brief uses
+ * for a panel that is reserved rather than broken.
+ */
+function EmptyPanel({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-[10px] border border-border border-dashed bg-card/40">
+      {children}
+    </div>
+  );
+}
+
+/**
+ * The loading state, drawn in the shape of the thing that is coming: a group
+ * heading and four rows, not four cards.
+ *
+ * `aria-hidden` with one `sr-only` live region rather than a wall of announced
+ * placeholder boxes — a screen reader should hear "Loading announcements",
+ * once. `<output>` rather than `role="status"`, which biome's
+ * `useSemanticElements` rejects (`docs/FINDINGS.md` §4).
+ */
+function FeedSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      <output className="sr-only">Loading announcements</output>
+      <Skeleton className="ml-1 h-3 w-16" />
+      <div
+        aria-hidden="true"
+        className="overflow-hidden rounded-[10px] border border-border bg-card"
+      >
+        {Array.from({ length: SKELETON_COUNT }, (_, index) => (
+          <div
+            // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length placeholder rows with no identity of their own, never reordered
+            key={index}
+            className="flex items-start gap-4 border-border border-b px-[18px] py-4 last:border-b-0"
+          >
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <Skeleton className="h-4 w-2/5" />
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+            <Skeleton className="h-[60px] w-[88px] flex-none rounded-md" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

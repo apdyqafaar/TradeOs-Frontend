@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ROUTES } from "@/config/routes";
 import { useCan } from "@/features/auth/hooks/use-permission";
 import { useOrganization } from "@/features/organization/hooks/use-organization";
+import { DeleteProductDialog } from "@/features/products/components/delete-product-dialog";
 import { ProductForm } from "@/features/products/components/product-form";
 import { StockCard } from "@/features/products/components/stock-card";
 import { StockMovementsTable } from "@/features/products/components/stock-movements-table";
@@ -73,6 +74,7 @@ export function ProductDetail({ id }: ProductDetailProps) {
 
   const [editing, setEditing] = useState(false);
   const [confirmingArchive, setConfirmingArchive] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // A 403 is not a failure to retry: nothing broke, the caller simply may not
   // read this. `ROUTE_PERMISSIONS` resolves `/products/<id>` to `products:view`
@@ -212,6 +214,26 @@ export function ProductDetail({ id }: ProductDetailProps) {
           {canUpdate && product.status === "archived" ? (
             <RestoreButton product={product} />
           ) : null}
+
+          {/*
+            Delete sits beside Archive rather than replacing it, and behind the
+            same `products:delete` permission, because they answer two
+            different questions: "take this off the counter" and "this should
+            never have existed". Only the second is refused once the product
+            has been sold.
+
+            Offered on an archived product too — archiving a mistake first and
+            deleting it afterwards is the likelier order, not a rarer one.
+          */}
+          {canArchive ? (
+            <Button
+              variant="ghost"
+              className="h-[38px] rounded-[10px] px-3.5 text-[13px] text-destructive hover:bg-destructive/10"
+              onClick={() => setConfirmingDelete(true)}
+            >
+              Delete
+            </Button>
+          ) : null}
         </div>
       </header>
 
@@ -289,6 +311,12 @@ export function ProductDetail({ id }: ProductDetailProps) {
         product={product}
         open={confirmingArchive}
         onOpenChange={setConfirmingArchive}
+      />
+
+      <DeleteProductDialog
+        product={product}
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
       />
     </div>
   );

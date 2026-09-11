@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   DataTable,
@@ -7,6 +8,7 @@ import {
 } from "@/components/shared/data-table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { ROUTES } from "@/config/routes";
 import type { ObjectId, PageMeta } from "@/lib/api/types";
 import { formatDate } from "@/lib/format/date";
 import {
@@ -106,7 +108,15 @@ export function MemberTable({
 
             <div className="flex min-w-0 flex-col">
               <span className="flex items-center gap-1.5 truncate font-medium text-[13px] text-foreground">
-                {primary}
+                {/* The name is the link, not the whole row: the row already
+                    holds a role select and an actions menu, and a row-level
+                    click target would fight both of them. */}
+                <Link
+                  href={ROUTES.teamMember(member.id)}
+                  className="truncate rounded-sm outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  {primary}
+                </Link>
                 {isSelfMember(member, sessionUserId) ? (
                   // Matched on `user.id`: `GET /auth/me` does not return the
                   // caller's own member id, so there is no member-level

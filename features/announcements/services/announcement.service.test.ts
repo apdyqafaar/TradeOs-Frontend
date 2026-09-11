@@ -222,3 +222,126 @@ describe("announcement service", () => {
     });
   });
 });
+
+describe("announcement read tracking", () => {
+  it("reads the unread count from a plain object, not a list envelope", async () => {
+    const service = await loadService({
+      status: 200,
+      data: { success: true, message: "Unread count", data: { count: 3 } },
+    });
+
+    // The envelope's `data` verbatim. `apiGetList` would have wrapped this
+    // object in a synthetic `{ items, meta }` around something that is not an
+    // array.
+    await expect(service.unreadCount()).resolves.toEqual({ count: 3 });
+    expect(seen[0].method).toBe("get");
+    expect(seen[0].url).toBe("/announcements/unread-count");
+  });
+
+  it("sends no id for 'who' — the member is the session's, like the tenant", async () => {
+    const service = await loadService({
+      status: 200,
+      data: { success: true, message: "Unread count", data: { count: 0 } },
+    });
+
+    await service.unreadCount();
+
+    expect(seen[0].params).toBeUndefined();
+    expect(seen[0].withCredentials).toBe(true);
+  });
+
+  it("posts a read receipt with no body at all", async () => {
+    const service = await loadService({
+      status: 200,
+      data: {
+        success: true,
+        message: "Marked read",
+        data: {
+          id: "68b0000000000000000000a1",
+          readAt: "2026-09-10T09:00:00.000Z",
+        },
+      },
+    });
+
+    const receipt = await service.markRead("68b0000000000000000000a1");
+
+    expect(receipt).toEqual({
+      id: "68b0000000000000000000a1",
+      readAt: "2026-09-10T09:00:00.000Z",
+    });
+    expect(seen[0].method).toBe("post");
+    expect(seen[0].url).toBe("/announcements/68b0000000000000000000a1/read");
+    // No member id, no organization id, no body — there is nothing the server
+    // needs that the session does not already say.
+    expect(seen[0].data).toBeUndefined();
+  });
+
+  it("treats an already-read notice as a success, not a conflict", async () => {
+    // The endpoint is idempotent and answers 200 with the existing receipt. A
+    // client that branched on 409 here would never be reached.
+    const service = await loadService({
+      status: 200,
+      data: {
+        success: true,
+        message: "Marked read",
+        data: {
+          id: "68b0000000000000000000a1",
+          readAt: "2026-09-09T06:00:00.000Z",
+        },
+      },
+    });
+
+    await expect(
+      service.markRead("68b0000000000000000000a1"),
+    ).resolves.toMatchObject({ readAt: "2026-09-09T06:00:00.000Z" });
+  });
+
+  it("marks everything read at a sibling path, never at /announcements/all/read", async () => {
+    const service = await loadService({
+      status: 200,
+      data: { success: true, message: "Marked all read", data: { count: 4 } },
+    });
+
+    await expect(service.markAllRead()).resolves.toEqual({ count: 4 });
+    // `read-all`, not `all/read`: the latter is a legal `:id` route with `all`
+    // as the id, and would answer 422 rather than 404.
+    expect(seen[0].url).toBe("/announcements/read-all");
+    expect(seen[0].method).toBe("post");
+  });
+
+  it("answers zero on a second mark-all, which is success and not a failure", async () => {
+    // `count` is how many were NEWLY marked. Rendering it as "you have read 0
+    // announcements" would be wrong, which is why nothing renders it.
+    const service = await loadService({
+      status: 200,
+      data: { success: true, message: "Marked all read", data: { count: 0 } },
+    });
+
+    await expect(service.markAllRead()).resolves.toEqual({ count: 0 });
+  });
+
+  it("normalises a 403 on the count into an ApiError with its code", async () => {
+    // Should be unreachable — `announcements:view` is in `PRESET_SELLER` — so
+    // it means a custom role was built without it. The hook's `enabled` guard
+    // is what keeps this from firing on every screen in the product.
+    const service = await loadService({
+      status: 403,
+      data: {
+        success: false,
+        message: "You do not have permission",
+        code: "FORBIDDEN",
+      },
+      headers: { "X-Request-Id": "req_unread" },
+    });
+
+    const error = await service
+      .unreadCount()
+      .catch((caught: unknown) => caught);
+
+    expect(isApiError(error)).toBe(true);
+    if (!isApiError(error)) throw new Error("unreachable");
+    expect(error.status).toBe(403);
+    expect(error.code).toBe("FORBIDDEN");
+    expect(error.requestId).toBe("req_unread");
+  });
+});

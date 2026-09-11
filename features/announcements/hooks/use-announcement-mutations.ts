@@ -40,6 +40,24 @@ import type { Announcement } from "../types";
  * `announcementKeys.detail(id)` invents nothing and lets the reading screen
  * update on the same frame.
  *
+ * **`announcementKeys.unreadCount()` is invalidated by all three**, added
+ * 2026-09-10 with read tracking. The badge in the sidebar and the feed must not
+ * be able to disagree, and each write can move the count:
+ *
+ *   - **create** puts an unread notice in front of every other member;
+ *   - **delete** removes one, which decrements the count for everybody who had
+ *     not read it and leaves it alone for everybody who had — a distinction no
+ *     client can compute, because it depends on other members' rows;
+ *   - **update** is the only arguable one. Pinning plainly does not change what
+ *     anyone has read. But this hook is also the edit, and whether the server
+ *     treats an edited notice as newly unread is *its* rule to make, not
+ *     something the client may assume. Invalidating asks; assuming is how a
+ *     badge ends up permanently one out.
+ *
+ * The count is deliberately never adjusted arithmetically here. It is a
+ * server-side fact about one member, and the same member may have the app open
+ * on a second device.
+ *
  * **`uploadKeys.lists()` is invalidated by all three**, and this is the
  * cross-feature edge that is easy to miss. Attaching a cover moves an upload out
  * of the *unattached* gallery `<ImagePicker>` shows; clearing or replacing one
@@ -96,6 +114,10 @@ export function useCreateAnnouncement(): UseMutationResult<
       void queryClient.invalidateQueries({
         queryKey: announcementKeys.lists(),
       });
+      // A notice nobody has read yet just appeared.
+      void queryClient.invalidateQueries({
+        queryKey: announcementKeys.unreadCount(),
+      });
       // A cover, if there was one, has just left the unattached gallery.
       void queryClient.invalidateQueries({ queryKey: uploadKeys.lists() });
     },
@@ -139,6 +161,11 @@ export function useUpdateAnnouncement(): UseMutationResult<
       void queryClient.invalidateQueries({
         queryKey: announcementKeys.lists(),
       });
+      // Asked rather than assumed: whether an edit makes a notice unread again
+      // is the server's rule, and the badge must not guess it.
+      void queryClient.invalidateQueries({
+        queryKey: announcementKeys.unreadCount(),
+      });
       // A replaced cover deletes the old upload's row outright; a cleared one
       // deletes the current image. Either way the gallery is stale.
       void queryClient.invalidateQueries({ queryKey: uploadKeys.lists() });
@@ -175,6 +202,12 @@ export function useDeleteAnnouncement(): UseMutationResult<
 
       void queryClient.invalidateQueries({
         queryKey: announcementKeys.lists(),
+      });
+      // An unread notice that no longer exists is one fewer unread notice —
+      // for everybody who had not opened it, which is not a fact this client
+      // holds.
+      void queryClient.invalidateQueries({
+        queryKey: announcementKeys.unreadCount(),
       });
       // The cover went with it.
       void queryClient.invalidateQueries({ queryKey: uploadKeys.lists() });

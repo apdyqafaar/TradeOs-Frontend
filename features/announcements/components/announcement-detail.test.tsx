@@ -22,6 +22,18 @@ vi.mock("../hooks/use-announcement-mutations", () => ({
   }),
 }));
 
+/**
+ * Marking read is stubbed here so this file can assert the *wiring* — what the
+ * screen hands the hook, and when. The four guards inside it (no row, no
+ * permission, already read, already marked) are the hook's own spec, against
+ * the axios adapter.
+ */
+const markReadOnView = vi.fn();
+vi.mock("../hooks/use-announcement-unread", () => ({
+  useMarkAnnouncementReadOnView: (announcement: unknown) =>
+    markReadOnView(announcement),
+}));
+
 vi.mock("@/features/organization/hooks/use-organization", () => ({
   useOrganization: () => ({
     currency: "USD",
@@ -84,6 +96,7 @@ beforeEach(() => {
   detailQuery.mockReset();
   detailQuery.mockReturnValue(answered(row()));
   updateMutate.mockReset();
+  markReadOnView.mockReset();
   push.mockReset();
   granted.clear();
   granted.add("announcements:update");
@@ -289,5 +302,56 @@ describe("AnnouncementDetail", () => {
   it("does not claim an edit when updatedAt equals createdAt", () => {
     render(<AnnouncementDetail announcementId="68b0000000000000000000a1" />);
     expect(screen.queryByText("· edited")).not.toBeInTheDocument();
+  });
+});
+
+describe("AnnouncementDetail — marking read", () => {
+  it("hands the loaded row to the mark-read hook, not the id", () => {
+    // The row rather than the id, so the hook can tell "shown to the reader"
+    // from "asked for and refused".
+    const announcement = row();
+    detailQuery.mockReturnValue(answered(announcement));
+    render(<AnnouncementDetail announcementId="68b0000000000000000000a1" />);
+
+    expect(markReadOnView).toHaveBeenCalledWith(announcement);
+  });
+
+  it("hands it nothing while the announcement is still loading", () => {
+    detailQuery.mockReturnValue({
+      data: undefined,
+      error: null,
+      isPending: true,
+      refetch: vi.fn(),
+    });
+    render(<AnnouncementDetail announcementId="68b0000000000000000000a1" />);
+
+    expect(markReadOnView).toHaveBeenCalledWith(undefined);
+  });
+
+  it("hands it nothing on a 404 — nothing was shown, so nothing was read", () => {
+    detailQuery.mockReturnValue(
+      failed(
+        new ApiError({
+          message: "Announcement not found",
+          status: 404,
+          code: "NOT_FOUND",
+        }),
+      ),
+    );
+    render(<AnnouncementDetail announcementId="68b0000000000000000000a1" />);
+
+    expect(markReadOnView).toHaveBeenCalledWith(undefined);
+  });
+
+  it("hands it nothing on a 403, and the hook is still called — hooks may not be conditional", () => {
+    // The 403 branch returns before the article renders, so the call must be
+    // above it. React would throw "rendered fewer hooks than expected" if this
+    // ever moved below a conditional return.
+    detailQuery.mockReturnValue(
+      failed(new ApiError({ message: "Nope", status: 403, code: "FORBIDDEN" })),
+    );
+    render(<AnnouncementDetail announcementId="68b0000000000000000000a1" />);
+
+    expect(markReadOnView).toHaveBeenCalledWith(undefined);
   });
 });

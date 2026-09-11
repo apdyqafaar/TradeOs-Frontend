@@ -146,3 +146,71 @@ describe("useDeleteAnnouncement", () => {
     expect(invalidated).toContainEqual(uploadKeys.lists());
   });
 });
+
+/**
+ * The badge in the sidebar and the feed must not be able to disagree, so every
+ * write that can move the count asks the server for it again — and none of them
+ * adjusts it arithmetically, because it is a fact about one member who may have
+ * the app open on a second device.
+ *
+ * The key is deliberately **not** filed under `lists`, so none of these passes
+ * as a side effect of the list invalidation that is already there.
+ */
+describe("the unread count after a write", () => {
+  it("is invalidated after posting a notice", async () => {
+    create.mockResolvedValue(row());
+    const { wrapper, invalidated } = harness();
+
+    const { result } = renderHook(() => useCreateAnnouncement(), { wrapper });
+    await act(async () => {
+      result.current.mutate({ title: "T", body: "B", pinned: false });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(invalidated).toContainEqual(announcementKeys.unreadCount());
+  });
+
+  it("is invalidated after an edit or a pin", async () => {
+    // Pinning plainly does not change what anybody has read — but this hook is
+    // also the edit, and whether an edited notice becomes unread again is the
+    // server's rule to make. Asking is one small GET; assuming is how a badge
+    // ends up permanently one out.
+    update.mockResolvedValue(row({ pinned: true }));
+    const { wrapper, invalidated } = harness();
+
+    const { result } = renderHook(() => useUpdateAnnouncement(), { wrapper });
+    await act(async () => {
+      result.current.mutate({ id: row().id, input: { pinned: true } });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(invalidated).toContainEqual(announcementKeys.unreadCount());
+  });
+
+  it("is invalidated after a delete", async () => {
+    // Deleting an unread notice decrements the count for everybody who had not
+    // opened it and leaves it alone for everybody who had — which is not a fact
+    // this client holds.
+    remove.mockResolvedValue(undefined);
+    const { wrapper, invalidated } = harness();
+
+    const { result } = renderHook(() => useDeleteAnnouncement(), { wrapper });
+    await act(async () => {
+      result.current.mutate("68b0000000000000000000a1");
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(invalidated).toContainEqual(announcementKeys.unreadCount());
+  });
+
+  it("does not sit under the lists key, so a list invalidation cannot stand in for it", () => {
+    // If `unreadCount` were `list({ unread: true })`, every write in the slice
+    // would refetch it by accident and nothing would ever state the dependency.
+    expect(announcementKeys.unreadCount()).not.toEqual(
+      expect.arrayContaining(["list"]),
+    );
+    // Still under the slice prefix, so `invalidateQueries({ queryKey: all })`
+    // reaches it.
+    expect(announcementKeys.unreadCount()[0]).toBe(announcementKeys.all[0]);
+  });
+});

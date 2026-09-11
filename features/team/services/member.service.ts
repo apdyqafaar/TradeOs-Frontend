@@ -1,4 +1,10 @@
-import { apiDelete, apiGetList, apiPatch, apiPost } from "@/lib/api/client";
+import {
+  apiDelete,
+  apiGet,
+  apiGetList,
+  apiPatch,
+  apiPost,
+} from "@/lib/api/client";
 import type { ObjectId, Paginated } from "@/lib/api/types";
 import type {
   ChangeMemberRoleInput,
@@ -75,6 +81,21 @@ export const list = (
  * invite row and its token survive so it can be resent, but "Invitation sent"
  * is not proof of delivery (`member.service.ts:180-185`).
  */
+/**
+ * `GET /members/:id` — one member, gated on `members:view`.
+ *
+ * **Answers exactly one row of `GET /members`**, `ListedMember` and not the
+ * `PublicMember` the four mutating endpoints return. That distinction is the
+ * whole reason this endpoint had to exist: `publicMember` carries no `user`
+ * and no `role` name, so it cannot name a person, and the list was previously
+ * the only shape that could.
+ *
+ * A removed member 404s, the same way they are absent from the list — there is
+ * no former-staff view anywhere in this product.
+ */
+export const get = (id: ObjectId): Promise<ListedMember> =>
+  apiGet<ListedMember>(`${BASE}/${id}`);
+
 export const invite = (input: InviteMemberInput): Promise<PublicMember> =>
   apiPost<PublicMember>(`${BASE}/invite`, input);
 

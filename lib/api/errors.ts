@@ -116,6 +116,12 @@ export const API_ERROR_CODE = Object.freeze({
   PRODUCT_ARCHIVED: "PRODUCT_ARCHIVED",
   STOCK_NOT_TRACKED: "STOCK_NOT_TRACKED",
   INSUFFICIENT_STOCK: "INSUFFICIENT_STOCK",
+  /**
+   * A permanent delete refused because the product has been sold.
+   * `details.saleCount` carries how many times, which is the number the
+   * decision is actually made on. 409 from `DELETE /products/:id/permanent`.
+   */
+  PRODUCT_HAS_SALES: "PRODUCT_HAS_SALES",
 
   // Categories.
   CATEGORY_EXISTS: "CATEGORY_EXISTS",

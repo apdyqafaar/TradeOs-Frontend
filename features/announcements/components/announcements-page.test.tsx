@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { withNuqsTestingAdapter } from "nuqs/adapters/testing";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api/errors";
 import type { Announcement } from "../types";
 import { AnnouncementsPage } from "./announcements-page";
@@ -8,6 +9,21 @@ import { AnnouncementsPage } from "./announcements-page";
 const listQuery = vi.fn();
 vi.mock("../hooks/use-announcements", () => ({
   useAnnouncements: (params: unknown) => listQuery(params),
+}));
+
+/**
+ * Read tracking. The page reads one number and owns one control, so both are
+ * stubbed here; the guards inside them have their own spec against the axios
+ * adapter (`hooks/use-announcement-unread.test.tsx`).
+ */
+const unreadQuery = vi.fn();
+const markAllMutate = vi.fn();
+vi.mock("../hooks/use-announcement-unread", () => ({
+  useUnreadAnnouncementCount: () => unreadQuery(),
+  useMarkAllAnnouncementsRead: () => ({
+    mutate: markAllMutate,
+    isPending: false,
+  }),
 }));
 
 vi.mock("@/features/organization/hooks/use-organization", () => ({
@@ -96,6 +112,9 @@ beforeEach(() => {
   listQuery.mockReturnValue(answered([row()]));
   can.mockReturnValue(true);
   push.mockReset();
+  unreadQuery.mockReset();
+  unreadQuery.mockReturnValue({ data: 0 });
+  markAllMutate.mockReset();
 });
 
 describe("AnnouncementsPage", () => {
@@ -236,5 +255,164 @@ describe("AnnouncementsPage", () => {
     expect(screen.getByRole("button", { name: /Newer/ })).toBeDisabled();
     expect(screen.getByRole("button", { name: /Older/ })).toBeEnabled();
     expect(screen.getByText("Page 1 of 3")).toBeInTheDocument();
+  });
+});
+
+describe("AnnouncementsPage — time groups", () => {
+  /**
+   * The clock is pinned so "Today" means a known day. Only `Date` is faked —
+   * `vi.useFakeTimers()` wholesale would freeze the timers `userEvent` needs,
+   * and this file has click tests in it.
+   */
+  const at = (iso: string) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(iso));
+  };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("puts pinned notices in their own group above everything", () => {
+    // The server sorts `{ pinned: -1, createdAt: -1 }` before it paginates, so
+    // the Pinned group is that ordering made legible rather than a client-side
+    // re-sort. A pinned notice from March belongs there, not under "Earlier".
+    at("2026-09-10T09:00:00.000Z");
+    listQuery.mockReturnValue(
+      answered([
+        // Pinned and six months old: it still belongs above everything.
+        row({
+          id: "a",
+          title: "Ramadan hours",
+          pinned: true,
+          createdAt: "2026-03-01T09:00:00.000Z",
+        }),
+        row({
+          id: "b",
+          title: "Today's delivery",
+          createdAt: "2026-09-10T05:00:00.000Z",
+        }),
+      ]),
+    );
+    renderPage();
+
+    expect(
+      screen.getByRole("heading", { name: "Pinned", level: 2 }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Today", level: 2 }),
+    ).toBeInTheDocument();
+  });
+
+  it("splits today, yesterday and older notices into their own headings", () => {
+    // Nairobi is UTC+3, so 2026-09-09T22:00Z is already the 10th locally —
+    // "Today", not "Yesterday". Grouping in the browser's zone would put it in
+    // the wrong bucket for the shop.
+    at("2026-09-10T09:00:00.000Z");
+    listQuery.mockReturnValue(
+      answered([
+        row({ id: "a", createdAt: "2026-09-09T22:00:00.000Z" }),
+        row({ id: "b", createdAt: "2026-09-09T05:00:00.000Z" }),
+        row({ id: "c", createdAt: "2026-09-07T05:00:00.000Z" }),
+        row({ id: "d", createdAt: "2026-08-01T05:00:00.000Z" }),
+      ]),
+    );
+    renderPage();
+
+    const headings = screen
+      .getAllByRole("heading", { level: 2 })
+      .map((node) => node.textContent);
+    expect(headings).toEqual([
+      "Today",
+      "Yesterday",
+      "Earlier this week",
+      "Earlier",
+    ]);
+  });
+
+  it("draws no heading for a group with nothing in it", () => {
+    at("2026-09-10T09:00:00.000Z");
+    listQuery.mockReturnValue(
+      answered([row({ createdAt: "2026-09-10T05:00:00.000Z" })]),
+    );
+    renderPage();
+
+    expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(1);
+    expect(screen.queryByText("Yesterday")).not.toBeInTheDocument();
+  });
+});
+
+describe("AnnouncementsPage — unread", () => {
+  it("shows nothing about unread when the member is up to date", () => {
+    // Not a zero and not a disabled control: "you have read everything" is
+    // better said by the absence than by a greyed-out button.
+    unreadQuery.mockReturnValue({ data: 0 });
+    renderPage();
+
+    expect(
+      screen.queryByRole("button", { name: /Mark all as read/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/unread/)).not.toBeInTheDocument();
+  });
+
+  it("shows nothing about unread while the count is still loading", () => {
+    unreadQuery.mockReturnValue({ data: undefined });
+    renderPage();
+
+    expect(
+      screen.queryByRole("button", { name: /Mark all as read/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("counts the unread notices beside the total and offers to clear them", () => {
+    unreadQuery.mockReturnValue({ data: 3 });
+    renderPage();
+
+    expect(screen.getByText("3 unread")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Mark all as read/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("says '1 unread', not '1 unreads'", () => {
+    unreadQuery.mockReturnValue({ data: 1 });
+    renderPage();
+    expect(screen.getByText("1 unread")).toBeInTheDocument();
+  });
+
+  it("marks everything read with no argument — the member is the session's", async () => {
+    unreadQuery.mockReturnValue({ data: 3 });
+    renderPage();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Mark all as read/ }),
+    );
+
+    expect(markAllMutate).toHaveBeenCalledTimes(1);
+    // `undefined` as the variables: there is no id for "who", server-side.
+    expect(markAllMutate.mock.calls[0][0]).toBeUndefined();
+  });
+
+  it("shows a failed mark-all at the control, not in a toast", async () => {
+    // brief §8.4 — a refusal belongs where the action was taken.
+    unreadQuery.mockReturnValue({ data: 3 });
+    markAllMutate.mockImplementation((_vars, options) => {
+      options.onError(
+        new ApiError({
+          message: "This business is suspended",
+          status: 403,
+          code: "FORBIDDEN",
+        }),
+      );
+    });
+    renderPage();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Mark all as read/ }),
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "This business is suspended",
+    );
   });
 });

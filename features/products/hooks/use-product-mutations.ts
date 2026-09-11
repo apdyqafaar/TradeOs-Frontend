@@ -119,3 +119,37 @@ export function useArchiveProduct(): UseMutationResult<
     },
   });
 }
+
+/**
+ * `DELETE /products/:id/permanent` — the real one.
+ *
+ * `removeQueries`, not `setQueryData`, and that is the whole difference from
+ * `useArchiveProduct` above: an archived product still exists and its detail
+ * page goes on rendering it with a badge, where a deleted one does not exist
+ * and a cached detail entry would let a stale tab keep showing a product the
+ * server 404s. The caller is expected to navigate away — this only makes sure
+ * the cache does not hand the old row back on the way out.
+ *
+ * Its stock movements go with it server-side, so their cache entries are
+ * dropped too. Refused with 409 `PRODUCT_HAS_SALES`; the dialog reads
+ * `details.saleCount` off the error and says so where the button was pressed.
+ */
+export function useDeleteProduct(): UseMutationResult<
+  { id: ObjectId },
+  ApiError,
+  ObjectId
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation<{ id: ObjectId }, ApiError, ObjectId>({
+    mutationFn: (id) => productService.remove(id),
+    onSuccess: (_result, id) => {
+      queryClient.removeQueries({ queryKey: productKeys.detail(id) });
+      queryClient.removeQueries({ queryKey: productKeys.movements(id) });
+      void queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+      // The barcode is free again — a cached 404 would refuse a scan of a code
+      // that has since been given to a different product.
+      void queryClient.invalidateQueries({ queryKey: productKeys.barcodes() });
+    },
+  });
+}

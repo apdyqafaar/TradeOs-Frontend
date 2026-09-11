@@ -3,13 +3,20 @@
 import { cn } from "cn";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { ComponentType } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { FOOTER_ITEMS, NAV_GROUPS, type NavItem } from "@/config/routes";
+import {
+  FOOTER_ITEMS,
+  NAV_GROUPS,
+  type NavBadgeKey,
+  type NavItem,
+} from "@/config/routes";
+import { AnnouncementsUnreadBadge } from "@/features/announcements/components/announcements-unread-badge";
 import { useCan } from "@/features/auth/hooks/use-permission";
 import { useSession } from "@/features/auth/hooks/use-session";
 import { resolveActiveHref } from "./nav-utils";
@@ -38,6 +45,45 @@ const GROUP_STYLES: Record<SidebarVariant, string> = {
   expanded: "gap-0.5 pb-2",
   rail: "items-center gap-1 pb-1",
   drawer: "gap-0.5 pb-1.5",
+};
+
+/**
+ * The live counters a nav item may carry, resolved from the token on the item.
+ *
+ * **Why a registry and not a prop, a context or a hook in `NavGroups`.** The
+ * requirement is one item with a live number and eleven without, and the nav is
+ * rendered three times over (aside, rail, mobile drawer) inside a layout that
+ * is on screen for the whole session. Four shapes were on the table:
+ *
+ * 1. **A `useQuery` in `NavGroups`.** One count would make the entire nav a
+ *    data-fetching component: every item's render would depend on a query none
+ *    of them use, a failure or a refetch would re-render eleven links, and the
+ *    second badge anybody wants would be a second hook in the same place.
+ * 2. **A `count` prop threaded from the shell.** Same problem one level up —
+ *    `Sidebar`, `MobileNav` and the drawer would each have to fetch and pass
+ *    it, so a fact about announcements would be spelled out in three layout
+ *    files that have nothing to do with announcements.
+ * 3. **The component itself on `NavItem`.** `config/routes.ts` is imported by
+ *    Server Components and by the server-side page gate; a `"use client"`
+ *    component sitting in it drags React Query and the announcements feature
+ *    into all of those import graphs to describe a link.
+ * 4. **This.** The config names a token, this map resolves it, and the badge
+ *    owns its own query. Exactly one `<li>` in the tree subscribes to anything;
+ *    the other eleven render as they always did. Adding a second counter later
+ *    is one token, one row here and one component — and `NavLink` does not
+ *    change at all.
+ *
+ * The component is mounted **inside the link**, deliberately, so its `sr-only`
+ * text becomes part of the anchor's accessible name — "Announcements, 3
+ * unread" rather than a stray number beside it — and so the rail's dot can be
+ * positioned against the link, which is why `relative` is in the link's class
+ * list below.
+ */
+const NAV_BADGES: Record<
+  NavBadgeKey,
+  ComponentType<{ collapsed?: boolean }>
+> = {
+  "announcements-unread": AnnouncementsUnreadBadge,
 };
 
 type NavLinkProps = {
@@ -72,6 +118,7 @@ function NavLink({
   const active = activeHref === item.href;
   const collapsed = variant === "rail";
   const Icon = item.icon;
+  const Badge = item.badge ? NAV_BADGES[item.badge] : null;
 
   const link = (
     <Link
@@ -79,7 +126,11 @@ function NavLink({
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex items-center outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
+        // `relative` is for the rail's badge dot, which is positioned against
+        // this link. Harmless on the other two variants, and keeping it in the
+        // base class list means the rail cannot lose it by way of a variant
+        // style being edited.
+        "relative flex items-center outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
         ROW_STYLES[variant],
         // The active pill is `#F6E7DF` behind `#D97757` at weight 500. That is
         // 2.6:1 and deliberate — owner decision 2026-09-07, locked by
@@ -96,6 +147,10 @@ function NavLink({
       <span className={cn("truncate", collapsed && "sr-only")}>
         {item.label}
       </span>
+      {/* After the label, so the accessible name reads "Announcements, 3
+          unread" in that order. Renders nothing at all at zero or while the
+          count is loading. */}
+      {Badge ? <Badge collapsed={collapsed} /> : null}
     </Link>
   );
 

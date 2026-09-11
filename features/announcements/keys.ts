@@ -43,6 +43,22 @@ export const announcementKeys = {
   details: () => keys.details,
 
   /**
+   * The sidebar badge's number — `GET /announcements/unread-count`.
+   *
+   * Added alongside the four `createQueryKeys` gives rather than squeezed into
+   * `list({ unread: true })`, which is what `lib/query/keys.ts` says to do for
+   * a key the helper does not cover. It matters here: this is **not** a list,
+   * and filing it under `lists` would mean every `invalidateQueries({ queryKey:
+   * lists() })` — which is every write in the slice — silently refetched it as
+   * a side effect, so nothing would ever state that the count depends on that
+   * write. Each mutation names it explicitly instead.
+   *
+   * It shares the `all` prefix, so `invalidateQueries({ queryKey: all })` still
+   * reaches both.
+   */
+  unreadCount: () => [...keys.all, "unread-count"] as const,
+
+  /**
    * One announcement.
    *
    * Seeded from create and patch responses, which return the whole

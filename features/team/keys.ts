@@ -45,6 +45,18 @@ export const memberKeys = {
    */
   list: (params: MemberListParams = {}) => members.list({ ...params }),
 
+  /** Every member detail, whatever its id. */
+  details: () => members.details,
+
+  /**
+   * One member, by id — `GET /members/:id`.
+   *
+   * Separate from the list rather than read out of it: a detail page opened
+   * from a link has no list in the cache to read, and the list is paginated so
+   * even a warm cache holds only the page the reader happened to be on.
+   */
+  detail: (id: string) => members.detail(id),
+
   /**
    * The whole directory — every non-removed member, all pages walked, used only
    * by `useMemberNames` to resolve a member id to a person.

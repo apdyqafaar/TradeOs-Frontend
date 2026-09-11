@@ -66,22 +66,53 @@ export const ROUTES = {
   /** Members live at /team; Roles is its sub-page. */
   team: "/team",
   teamRoles: "/team/roles",
+  /**
+   * One member.
+   *
+   * A sibling of the literal `/team/roles`, which is safe: Next resolves a
+   * literal segment ahead of a dynamic one, so `/team/roles` keeps reaching
+   * the roles screen and never arrives here as an id.
+   *
+   * Deliberately NOT given its own `ROUTE_PERMISSIONS` row —
+   * `resolveRoutePermission` falls back to the longest matching prefix, which
+   * is `/team` and therefore `members:invite`. Member management is one
+   * area and one gate; a Seller holds `members:view` so that a name can be
+   * resolved on a receipt, not so they can open a colleague's record.
+   */
+  teamMember: (id: string) => `/team/${id}`,
   settings: "/settings",
   account: "/account",
   help: "/help",
 } as const;
 
 /**
+ * The live counters a nav item may carry, named rather than imported.
+ *
+ * **A token, not a component.** This file is imported by Server Components,
+ * by `lib/auth/route-permissions.ts` and by the server-side page gate; putting
+ * a `"use client"` badge component in it would drag a React Query hook and its
+ * whole feature into every one of those import graphs to describe a nav item.
+ * `components/layout/nav.tsx` maps this string to the component and is the
+ * only file that needs to know one exists — see `NAV_BADGES` there for why the
+ * indirection is a token and not, say, a `count` number passed in.
+ */
+export type NavBadgeKey = "announcements-unread";
+
+/**
  * `permission` omitted means the item is always visible. When present it is a
  * single permission the caller must hold; the sidebar drops the item entirely
  * rather than disabling it, because the brief (section 1.1) is explicit that a
  * Seller must not learn that Reports exists.
+ *
+ * `badge` names a live counter to hang off this one item. Omitted on every
+ * item that does not have one, which is all of them but Announcements.
  */
 export type NavItem = {
   label: string;
   href: string;
   icon: LucideIcon;
   permission?: Permission;
+  badge?: NavBadgeKey;
 };
 
 export type NavGroup = {
@@ -129,7 +160,15 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Team",
     items: [
-      { label: "Announcements", href: ROUTES.announcements, icon: Megaphone },
+      {
+        label: "Announcements",
+        href: ROUTES.announcements,
+        icon: Megaphone,
+        // No `permission`: `announcements:view` is held by every preset, so
+        // this row is visible to every member — and so is its badge, which is
+        // gated on the same permission one layer down rather than here.
+        badge: "announcements-unread",
+      },
       {
         label: "Projects",
         href: ROUTES.projects,

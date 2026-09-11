@@ -68,9 +68,21 @@ call, and reads `requirePermission(PERMISSIONS.X)` and `requireVerifiedEmail` ou
 |---|---|---|
 | GET | `/announcements` | announcements:view |
 | POST | `/announcements` | announcements:create |
+| GET | `/announcements/unread-count` | announcements:view |
+| POST | `/announcements/read-all` | announcements:view |
 | DELETE | `/announcements/:id` | announcements:delete |
 | GET | `/announcements/:id` | announcements:view |
 | PATCH | `/announcements/:id` | announcements:update |
+| POST | `/announcements/:id/read` | announcements:view |
+
+**Read state is per member and is on `announcements:view`, not a permission of
+its own** — clearing your own badge is part of reading a notice, so a Seller can
+do it. `GET /announcements` carries `readAt` on every row: `null` for unread, an
+ISO instant for read, resolved against the **calling member**, so two people see
+different answers for one notice. `GET /announcements/:id` does **not** carry it
+— the reading view marks the notice read on arrival, so the value would describe
+a state that is already gone. `POST /announcements/:id/read` is idempotent and
+answers 200 with the original `readAt` on a repeat.
 
 ### features/auth
 
@@ -158,11 +170,22 @@ call, and reads `requirePermission(PERMISSIONS.X)` and `requireVerifiedEmail` ou
 | GET | `/products` | products:view |
 | POST | `/products` | products:create |
 | DELETE | `/products/:id` | products:delete |
+| DELETE | `/products/:id/permanent` | products:delete |
 | GET | `/products/:id` | products:view |
 | PATCH | `/products/:id` | products:update |
 | POST | `/products/:id/stock` | products:adjust_stock |
 | GET | `/products/:id/stock-movements` | products:view |
 | GET | `/products/barcode/:code` | products:view |
+
+**The two DELETEs are not the same verb.** `DELETE /products/:id` **archives** —
+it sets `status: "archived"`, the product goes on existing, `GET /products/:id`
+still returns it, and the UI says "Archive" (brief §9). `DELETE
+/products/:id/permanent` is the real one: the product and its stock movements
+are gone and its uploads are released. The permanent one is refused with 409
+`PRODUCT_HAS_SALES` (`details.saleCount`) once the product has been sold,
+because a receipt cites a product whose stock history would otherwise vanish
+from under it. Same permission on both — `products:delete`, which Sellers do
+not hold.
 
 ### features/projects
 
@@ -212,6 +235,7 @@ call, and reads `requirePermission(PERMISSIONS.X)` and `requireVerifiedEmail` ou
 | Method | Path | Requires |
 |---|---|---|
 | GET | `/members` | members:view |
+| GET | `/members/:id` | members:view |
 | DELETE | `/members/:id` | members:remove |
 | PATCH | `/members/:id` | members:update |
 | POST | `/members/:id/resend-invite` | members:invite + verified email |

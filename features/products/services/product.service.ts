@@ -141,6 +141,27 @@ export const archive = (id: ObjectId): Promise<Product> =>
   apiDelete<Product>(`${BASE}/${id}`);
 
 /**
+ * `DELETE /products/:id/permanent` — the real delete, and a separate endpoint
+ * precisely because `DELETE /products/:id` above does not delete anything.
+ *
+ * The product row and its stock movements go; its uploads are released. What
+ * survives is every receipt that ever sold it, because a sale snapshots the
+ * item's name, unit and prices at the moment it was rung up and never reads
+ * the product back.
+ *
+ * **Refused with 409 `PRODUCT_HAS_SALES` when the product has been sold**, and
+ * `details.saleCount` says how many times. The movements are the record of how
+ * the stock got where it was; deleting them under a receipt that still cites
+ * the product would leave a sale nobody can account for. Archive is the answer
+ * for a product with history — this is for the one typed in by mistake.
+ *
+ * Answers with `{ id }` rather than the product, since there is no longer a
+ * product to put back in the cache.
+ */
+export const remove = (id: ObjectId): Promise<{ id: ObjectId }> =>
+  apiDelete<{ id: ObjectId }>(`${BASE}/${id}/permanent`);
+
+/**
  * `POST /products/:id/stock` — the only way a person can move stock.
  *
  * Answers with both halves of the write: the product at its new quantity and

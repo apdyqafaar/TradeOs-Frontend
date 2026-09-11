@@ -63,10 +63,14 @@ export interface AnnouncementAuthor {
 /**
  * One announcement, identical on list, get, create and patch.
  *
- * **`pinned` is the only state flag that exists** (contract §2.5). There is no
- * draft/publish state, no audience, no scheduling, no expiry, no read tracking
- * and no soft delete: an announcement is live to every member the moment it is
- * created, and deleting one is a hard `findOneAndDelete` with no undo.
+ * **`pinned` is the only state flag on the row itself** (contract §2.5). There
+ * is no draft/publish state, no audience, no scheduling, no expiry and no soft
+ * delete: an announcement is live to every member the moment it is created,
+ * and deleting one is a hard `findOneAndDelete` with no undo.
+ *
+ * Read tracking is the one thing that has changed since this file was written,
+ * and it arrived as three *aggregate* endpoints rather than as a field —
+ * see `readAt` below.
  */
 export interface Announcement {
   id: ObjectId;
@@ -90,6 +94,68 @@ export interface Announcement {
   createdAt: string;
   /** Moves on every edit. Editing never reassigns `createdBy` / `author`. */
   updatedAt: string;
+  /**
+   * When **the calling member** read this notice — `null` when they have not,
+   * and **absent when the API does not send it at all**.
+   *
+   * Optional, and that is the whole point rather than defensiveness. The read
+   * tracking added on 2026-09-10 is three endpoints and no field:
+   * `GET /announcements/unread-count`, `POST /announcements/:id/read` and
+   * `POST /announcements/read-all` (see `services/announcement.service.ts`).
+   * An aggregate count says *how many* are unread; it can never say *which*,
+   * because the feed is sorted `pinned, createdAt` and an unread notice may sit
+   * on any page.
+   *
+   * So the feed's per-row dot is driven by this field when the row carries it
+   * and by nothing at all when it does not — `isUnread()` in
+   * `lib/group-announcements.ts` is `readAt === null`, which is `false` for an
+   * absent field. The screen degrades to "no dots, correct count" rather than
+   * guessing.
+   *
+   * **`GET /announcements` now carries it** (added 2026-09-11, the same day as
+   * the three endpoints above): every row of the feed has the key, `null` for
+   * unread and an ISO instant for read, resolved against the **calling
+   * member** — two people see different answers for one notice, which is why
+   * it is attached per request rather than stored on the announcement.
+   *
+   * It stays **optional** all the same, because `GET /announcements/:id` does
+   * not carry it and shares this type. That is not an oversight: the reading
+   * view marks the notice read on arrival, so a `readAt` there would describe
+   * a state that is already gone by the time anything renders.
+   */
+  readAt?: string | null;
+}
+
+/**
+ * `GET /announcements/unread-count` — `announcements:view`.
+ *
+ * Org-scoped *and* member-scoped server-side: the count is the caller's own,
+ * and there is no id to send for "who" (CLAUDE.md — never send an
+ * organization id, and the same reasoning covers the member).
+ */
+export interface AnnouncementUnreadCount {
+  count: number;
+}
+
+/**
+ * `POST /announcements/:id/read` — idempotent, 200 even when already read.
+ *
+ * `id` is the announcement's, `readAt` the instant the server recorded. The
+ * receipt is what lets the caller patch its cached row in place instead of
+ * inventing a timestamp.
+ */
+export interface AnnouncementReadReceipt {
+  id: ObjectId;
+  readAt: string;
+}
+
+/**
+ * `POST /announcements/read-all` — `count` is **how many were newly marked**,
+ * not how many exist. It is therefore 0 on a second call, which is the
+ * signature of a well-behaved idempotent bulk write and not a failure.
+ */
+export interface AnnouncementReadAllResult {
+  count: number;
 }
 
 /**

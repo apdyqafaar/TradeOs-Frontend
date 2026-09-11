@@ -10,7 +10,13 @@ import type {
   CreateAnnouncementInput,
   UpdateAnnouncementInput,
 } from "../schemas/announcement.schema";
-import type { Announcement, AnnouncementListParams } from "../types";
+import type {
+  Announcement,
+  AnnouncementListParams,
+  AnnouncementReadAllResult,
+  AnnouncementReadReceipt,
+  AnnouncementUnreadCount,
+} from "../types";
 
 /**
  * The only file in this slice that knows a URL exists.
@@ -20,7 +26,7 @@ import type { Announcement, AnnouncementListParams } from "../types";
  * `{ success, message, data, meta }` and turned every failure into an
  * `ApiError`, so what these functions return is the domain object.
  *
- * All five `/announcements` rows in `docs/API-ROUTES.md` are wrapped here and
+ * All eight `/announcements` rows in `docs/API-ROUTES.md` are wrapped here and
  * nothing else is. **No organization id is sent** — `requireMember` resolves
  * the tenant from the caller's session on every request, and an announcement
  * belonging to another business is a 404 rather than a 403 so an id cannot be
@@ -138,3 +144,60 @@ export const update = (
  */
 export const remove = (id: ObjectId): Promise<void> =>
   apiDelete<void>(`${BASE}/${id}`);
+
+/* ------------------------------------------------------------------ *
+ * Read tracking — three endpoints, added 2026-09-10.
+ *
+ * All three are gated on `announcements:view`, which **every member holds**
+ * (it is in `PRESET_SELLER`), so there is no member who can read a notice and
+ * not mark it read. They are org-scoped *and* member-scoped server-side:
+ * nothing here sends an id for "who", the same rule as the tenant.
+ *
+ * The shape to keep in mind is that read state arrived as **aggregates, not as
+ * a field**. `unreadCount` says how many; nothing says *which*, because the
+ * feed is sorted `pinned, createdAt` and an unread notice can sit on any page.
+ * `Announcement.readAt` is therefore typed optional and the feed's per-row dot
+ * degrades to nothing when the rows do not carry it.
+ * ------------------------------------------------------------------ */
+
+/**
+ * `GET /announcements/unread-count` — `announcements:view`.
+ *
+ * Returns the envelope's `data` verbatim, `{ count }`, rather than reaching in
+ * for the number: the projection belongs to the hook's `select`, and a service
+ * that quietly returns a scalar hides the shape the next endpoint change will
+ * break.
+ *
+ * **Not `apiGetList`.** This is a single object with no `meta`, so the list
+ * helper would wrap it in a synthetic one-page envelope and hand back
+ * `{ items: …, meta: … }` around an object that is not an array.
+ */
+export const unreadCount = (): Promise<AnnouncementUnreadCount> =>
+  apiGet<AnnouncementUnreadCount>(`${BASE}/unread-count`);
+
+/**
+ * `POST /announcements/:id/read` — `announcements:view`. **Idempotent**: 200
+ * with the existing receipt when the member has already read it, never a 409.
+ *
+ * No body. The member is the session's and the announcement is the path's;
+ * there is nothing else the server needs and nothing else it accepts.
+ *
+ * The 404 surface is the same as `getById` — an unknown or cross-tenant id is
+ * "not found" rather than "forbidden", so an id cannot be probed — and a
+ * malformed id is a **422**, because `validate` runs before the handler.
+ */
+export const markRead = (id: ObjectId): Promise<AnnouncementReadReceipt> =>
+  apiPost<AnnouncementReadReceipt>(`${BASE}/${id}/read`);
+
+/**
+ * `POST /announcements/read-all` — `announcements:view`.
+ *
+ * `count` is **how many were newly marked**, so calling it twice answers `0`
+ * the second time. Do not render it as "you have read 0 announcements".
+ *
+ * The path is a sibling of `:id`, not a child, which is why it is spelled
+ * `read-all` rather than `all/read`: `/announcements/all/read` would be a
+ * legal `:id` route with `all` as the id and would answer 422.
+ */
+export const markAllRead = (): Promise<AnnouncementReadAllResult> =>
+  apiPost<AnnouncementReadAllResult>(`${BASE}/read-all`);
