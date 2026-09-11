@@ -1,7 +1,16 @@
 "use client";
 
 import { cn } from "cn";
-import { parseAsInteger, parseAsStringLiteral, useQueryStates } from "nuqs";
+import {
+  parseAsInteger,
+  parseAsString,
+  parseAsStringLiteral,
+  useQueryStates,
+} from "nuqs";
+import {
+  amountRangeIssue,
+  parseAmount,
+} from "@/features/debts/lib/amount-range";
 import {
   DEBT_STATUS_FILTERS,
   type DebtListParams,
@@ -38,18 +47,27 @@ export const DEBT_STATUS_LABELS: Record<DebtStatusFilter, string> = {
  * filtered list must survive a reload, a shared link and the back button, and
  * none of those work when the state lives in a store.
  *
- * **There are only three keys, and that is the whole of what `GET /debts`
- * accepts.** `listDebtsQuerySchema` is `page`, `limit`, `status`, `customerId`
- * and `.strict()` — no `search`, no date window, no `sort`. So there is no
- * search box on this screen (a fourth key would be a 422, and a client-side
- * filter over one page of N would lie about the rest), and no sortable column
- * (see `<DebtTable>`).
+ * **`search` and the amount range are real server-side filters** as of
+ * 2026-09-11 (`listDebtsQuerySchema` gained `search`, `minAmount`, `maxAmount`).
+ * Before that this file argued there could be no search box at all, because a
+ * fourth key was a 422 and a client-side filter over one page of N would lie
+ * about the rest. The first half of that stopped being true; the second half
+ * never will, which is why these narrow the query rather than the page.
  *
- * `customerId` is deliberately left out too. The API takes it and it is the
- * documented substitute for search, but this page has no control that could set
- * or clear one — a URL-only filter would quietly narrow the list with nothing
- * on screen saying so. A customer's debts are on their own page, which already
- * queries `{ customerId, status: "all" }`.
+ * There is still **no sortable column** — `GET /debts` has no `sort`, and its
+ * order changes with `status` (see `<DebtTable>`).
+ *
+ * `customerId` is deliberately left out. The API takes it, but this page has no
+ * control that could set or clear one — a URL-only filter would quietly narrow
+ * the list with nothing on screen saying so — and `search` is now the reachable
+ * way to find one person's debts. A customer's full history is still on their
+ * own page, which queries `{ customerId, status: "all" }`.
+ *
+ * The two amount keys are held as **strings**, not numbers. A half-typed
+ * "12." is not a number and neither is an empty box, and a parser that coerced
+ * them would put `NaN` in the URL and in the query key. They are parsed at the
+ * edge, in `toDebtListParams`, which is also where an unusable range is
+ * dropped rather than sent.
  *
  * `status` defaults to `"open"` because that is what the backend already does
  * when the key is absent (`debt.validation.ts:18`). Matching it here keeps the
@@ -59,6 +77,9 @@ export const DEBT_STATUS_LABELS: Record<DebtStatusFilter, string> = {
  */
 const DEBT_FILTER_PARSERS = {
   status: parseAsStringLiteral(DEBT_STATUS_FILTERS).withDefault("open"),
+  search: parseAsString.withDefault(""),
+  minAmount: parseAsString.withDefault(""),
+  maxAmount: parseAsString.withDefault(""),
   page: parseAsInteger.withDefault(1),
   limit: parseAsInteger.withDefault(25),
 };
@@ -83,19 +104,51 @@ export type SetDebtFilters = ReturnType<typeof useDebtFilters>[1];
 /**
  * URL state → `GET /debts` query.
  *
- * A straight copy, unlike `toCustomerListParams`, because none of the three
- * keys has an "empty" value that the `.strict()` schema would refuse: `status`
- * is always one of the six enum members and both numbers are integers ≥ 1.
- * `status` is sent even when it equals the server's own default, which keeps
- * the request self-describing and the React Query key honest about what was
- * asked for.
+ * `status`, `page` and `limit` are a straight copy — none of them has an
+ * "empty" value the `.strict()` schema would refuse, and `status` is sent even
+ * when it equals the server's own default so the request stays
+ * self-describing and the React Query key stays honest about what was asked.
+ *
+ * The three filters added in 2026-09 are **dropped rather than sent empty**,
+ * the same call `toCustomerListParams` makes: `search` is
+ * `z.string().trim().min(1)` so `?search=` is a 422 on the *normal* state of
+ * this page, and the amounts are numbers so `""` is not even the right type.
+ * Dropping is not only about the 422 — these params are also the React Query
+ * key, and `{ search: "" }` and `{}` hash differently, so sending an empty key
+ * would cache the unfiltered list twice.
+ *
+ * **An unusable range is not sent at all.** `amountRangeIssue` catches
+ * reversed, negative, non-numeric and over-precise pairs, every one of which
+ * the server answers with a 422 or an empty list, and the bar shows the reason
+ * beside the boxes instead. Same argument `lib/period.ts` makes for dates: a
+ * request whose answer is already known is a spinner followed by a red card.
+ * A half-open range is perfectly usable and is sent.
  */
 export function toDebtListParams(filters: DebtFilters): DebtListParams {
+  const search = filters.search.trim();
+  const rangeOk =
+    amountRangeIssue(filters.minAmount, filters.maxAmount) === null;
+
+  const min = rangeOk ? parseAmount(filters.minAmount) : null;
+  const max = rangeOk ? parseAmount(filters.maxAmount) : null;
+
   return {
     page: filters.page,
     limit: filters.limit,
     status: filters.status,
+    ...(search === "" ? {} : { search }),
+    ...(min === null ? {} : { minAmount: min }),
+    ...(max === null ? {} : { maxAmount: max }),
   };
+}
+
+/** True when any filter beyond the status tab is narrowing the list. */
+export function hasDebtFilters(filters: DebtFilters): boolean {
+  return (
+    filters.search.trim() !== "" ||
+    filters.minAmount.trim() !== "" ||
+    filters.maxAmount.trim() !== ""
+  );
 }
 
 /**

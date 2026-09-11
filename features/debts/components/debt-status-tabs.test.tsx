@@ -17,6 +17,9 @@ import {
 
 const filters = (overrides: Partial<DebtFilters> = {}): DebtFilters => ({
   status: "open",
+  search: "",
+  minAmount: "",
+  maxAmount: "",
   page: 1,
   limit: 25,
   ...overrides,

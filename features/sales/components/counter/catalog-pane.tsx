@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "cn";
-import { PackageSearch, ScanBarcode, Search } from "lucide-react";
+import { Camera, PackageSearch, ScanBarcode, Search } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorCard } from "@/components/shared/error-card";
@@ -13,6 +13,8 @@ import {
   isOutOfStock,
   ProductTile,
 } from "@/features/sales/components/counter/product-tile";
+import { ScanSheet } from "@/features/sales/components/counter/scan-sheet";
+import { useCameraSupport } from "@/features/sales/hooks/use-camera-scanner";
 
 /** `customer-picker.tsx`'s figure, and for the same reason: one request per
  *  pause, not one per keystroke. */
@@ -76,6 +78,8 @@ export function CatalogPane({
   const [scanning, setScanning] = useState<string | null>(null);
   /** A submitted term that matched nothing — the only thing a scanner gets wrong. */
   const [scanMiss, setScanMiss] = useState<string | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const cameraSupport = useCameraSupport();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(
@@ -201,6 +205,31 @@ export function CatalogPane({
           </span>
         </div>
 
+        {/*
+          Offered only where it can actually work. `useCameraSupport` answers
+          `null` until the first client effect — it reads `navigator` and
+          `window`, and answering during render would decide for the server
+          and then disagree with the client, which is a hydration mismatch on
+          the one screen that must not flicker.
+
+          A button that opens a camera and then silently never decodes is worse
+          than no button, so an iPhone (no `BarcodeDetector`) and a phone on a
+          plain-HTTP LAN address (no secure context) both get nothing here. The
+          laser scanner and typing the barcode work everywhere and are what
+          this field is for.
+        */}
+        {cameraSupport?.available ? (
+          <button
+            type="button"
+            aria-label="Scan with the camera"
+            disabled={disabled}
+            onClick={() => setCameraOpen(true)}
+            className="flex size-[52px] flex-none items-center justify-center rounded-[10px] border border-border bg-card text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+          >
+            <Camera className="size-5" aria-hidden="true" />
+          </button>
+        ) : null}
+
         <button
           type="submit"
           aria-label="Search products"
@@ -210,6 +239,21 @@ export function CatalogPane({
           <Search className="size-5" aria-hidden="true" />
         </button>
       </form>
+
+      {/* A decoded barcode is committed exactly as a typed Enter is — same
+          debounce skip, same single-match auto-add, same `scanMiss`. The
+          camera is an input method, not a second lookup. */}
+      <ScanSheet
+        open={cameraOpen}
+        onOpenChange={setCameraOpen}
+        onDecode={(value) => {
+          setDraft(value);
+          setScanMiss(null);
+          if (timer.current) clearTimeout(timer.current);
+          setSearch(value);
+          setScanning(value);
+        }}
+      />
 
       {scanMiss !== null ? (
         // Announced, because the cashier is looking at the shelf and not at

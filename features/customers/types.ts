@@ -37,6 +37,52 @@ export interface Customer {
 }
 
 /**
+ * A customer **as a row of `GET /customers`** — the nine shared fields plus
+ * the figures the list can be ranked by.
+ *
+ * Separate from `Customer` rather than an optional field on it, and the type
+ * checker is what forced the distinction: `POST`, `PATCH` and `DELETE` all
+ * answer through the same `publicCustomer` shaper and carry **no** stats, so
+ * `stats` on `Customer` would have been a lie in three places and an optional
+ * one would have pushed a `?.` into every call site. Same split as
+ * `ListedMember` against `PublicMember`.
+ *
+ * **Present on every row of the list, whatever the sort.** Sorting by a number
+ * the row does not show is not a usable screen, and stats that appeared only
+ * under some sorts would make the table change shape when somebody changed the
+ * order.
+ */
+export interface ListedCustomer extends Customer {
+  stats: CustomerStats;
+}
+
+/**
+ * What a customer owes and what they have bought.
+ *
+ * Every figure is in the organization's **main currency** — these are sums of
+ * `Debt.remaining` and `Sale.total`, both stored in main currency, so nothing
+ * here needs converting.
+ *
+ * `overdueAmount` is computed, never stored: a debt is overdue when it is
+ * `open ∧ dueDate < now ∧ remaining > 0`, evaluated at request time. Two
+ * requests a second apart can legitimately disagree across midnight.
+ *
+ * `salesTotal` counts **completed sales only** — a voided sale is not a sale,
+ * and counting one would make the best customer the one whose sales were
+ * reversed.
+ */
+export interface CustomerStats {
+  /** Sum of `remaining` over this customer's open debts. */
+  outstanding: number;
+  /** The part of `outstanding` that is past its due date. */
+  overdueAmount: number;
+  overdueCount: number;
+  /** Sum of `Sale.total` over completed sales. Voided sales excluded. */
+  salesTotal: number;
+  salesCount: number;
+}
+
+/**
  * A number of debts. **Not money.**
  *
  * This alias exists so the two counts below cannot be read as amounts at a
@@ -103,8 +149,26 @@ export interface CustomerDetailResponse extends Customer {
 export type CustomerStatusFilter = "active" | "archived" | "all";
 
 /**
- * Everything `GET /customers` accepts — pagination plus these two, and
- * nothing else (`listCustomersQuerySchema` is `.strict()`).
+ * How the customer list may be ordered.
+ *
+ * `name` is the cheap path the endpoint has always had. The other three are
+ * **aggregates over other collections** — Debt for the first two, Sale for the
+ * third — so the server has to join, compute and sort before it paginates.
+ * Sorting a page that has already been fetched sorts twenty-five rows and lies
+ * about every other page, which is the same failure this codebase records for
+ * client-side filtering.
+ */
+export const CUSTOMER_SORTS = [
+  "name",
+  "outstanding",
+  "overdue",
+  "sales",
+] as const;
+export type CustomerSort = (typeof CUSTOMER_SORTS)[number];
+
+/**
+ * Everything `GET /customers` accepts (`listCustomersQuerySchema` is
+ * `.strict()`, so anything else is a 422 rather than an ignored key).
  *
  * Flat and scalar-only on purpose: this is what `nuqs` keeps in the URL and
  * what goes into the React Query key.
@@ -124,4 +188,26 @@ export interface CustomerListParams extends PaginationParams {
    * `"all"`.
    */
   status?: CustomerStatusFilter;
+  /**
+   * Added 2026-09-11, for "who owes me the most" and "who buys the most".
+   *
+   * Defaults to `name` server-side. The other three sort on a joined
+   * aggregate, which is materially more expensive — see `CUSTOMER_SORTS`.
+   */
+  sort?: CustomerSort;
+  /**
+   * `asc` for `name`, `desc` for the three aggregates, which is what each one
+   * is actually asked for: customers alphabetically, but debts and sales
+   * biggest-first. Sent explicitly so the request says what it wants rather
+   * than relying on a default that differs per sort.
+   */
+  order?: "asc" | "desc";
+  /**
+   * Only customers with at least one **overdue** debt.
+   *
+   * Distinct from `sort=overdue`, which orders everyone by how much is
+   * overdue and still lists the people who owe nothing. This is the collections
+   * worklist: the ones to call today.
+   */
+  hasOverdue?: boolean;
 }

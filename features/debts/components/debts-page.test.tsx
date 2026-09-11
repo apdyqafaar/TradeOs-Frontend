@@ -115,14 +115,24 @@ describe("DebtsPage", () => {
     expect(screen.queryByText("USD 4,120.25")).not.toBeInTheDocument();
   });
 
-  it("renders no search box, because the query schema has no search key", () => {
-    // `listDebtsQuerySchema` is `.strict()`: `page`, `limit`, `status`,
-    // `customerId`. A box that filtered the fetched page client-side would claim
-    // to search the debt book while only ever seeing 25 rows of it.
+  it("searches by customer name, and by amount owed", () => {
+    // This test used to assert the search box's ABSENCE. `listDebtsQuerySchema`
+    // was `.strict()` with only `page`, `limit`, `status` and `customerId`, so
+    // a box could only have filtered the fetched page client-side — claiming to
+    // search the debt book while seeing 25 rows of it. The schema gained
+    // `search`, `minAmount` and `maxAmount` on 2026-09-11, so these narrow the
+    // QUERY now and the assertion is the other way round.
     renderPage();
 
-    expect(screen.queryByRole("searchbox")).toBeNull();
-    expect(screen.queryByPlaceholderText(/search/i)).toBeNull();
+    expect(
+      screen.getByRole("searchbox", { name: /customer name/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: /smallest amount owed/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: /largest amount owed/i }),
+    ).toBeInTheDocument();
   });
 
   it("links the 'New debt' action at the create screen that now exists", () => {

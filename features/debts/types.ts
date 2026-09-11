@@ -259,6 +259,31 @@ export interface DebtListParams extends PaginationParams {
   status?: DebtStatusFilter;
   /** 24-hex customer id. The only way to scope the list to one customer. */
   customerId?: ObjectId;
+  /**
+   * A prefix of the **customer's name** — not the debt's description.
+   *
+   * Matched server-side against `Customer.searchName`, the maintained
+   * lower-cased copy of the name, so a debt is findable by who owes it without
+   * the caller knowing their id. Added 2026-09-11.
+   *
+   * `listDebtsQuerySchema` is `.strict()` and its `search` is
+   * `z.string().trim().min(1).max(100)`, so `?search=` is a **422**, not an
+   * ignored key. The key is dropped rather than sent empty — see
+   * `toDebtListParams`.
+   */
+  search?: string;
+  /**
+   * The smallest and largest **`remaining`** — what is still owed, not what the
+   * debt started at.
+   *
+   * Money, so two decimal places; the server refuses a third. Inclusive at
+   * both ends, and either may be sent without the other.
+   *
+   * **A paid debt has `remaining: 0`**, so `status=paid` with a `minAmount`
+   * above zero is legitimately empty. That is the filter working, not a bug.
+   */
+  minAmount?: number;
+  maxAmount?: number;
 }
 
 /**

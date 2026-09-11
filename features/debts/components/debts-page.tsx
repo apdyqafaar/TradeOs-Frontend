@@ -8,6 +8,7 @@ import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/config/routes";
 import { useCan } from "@/features/auth/hooks/use-permission";
+import { DebtFiltersBar } from "@/features/debts/components/debt-filters";
 import {
   DEBT_STATUS_LABELS,
   DebtStatusTabs,
@@ -195,6 +196,10 @@ export function DebtsPage() {
         onStatusChange={(status) => void setFilters({ status, page: 1 })}
         panelId={PANEL_ID}
       />
+
+      {/* Below the tabs, not beside them: the tab picks WHICH debts, these
+          narrow WITHIN that pick, and stacking them says so. */}
+      <DebtFiltersBar filters={filters} setFilters={setFilters} />
 
       {error ? (
         <ErrorCard
