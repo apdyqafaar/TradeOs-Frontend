@@ -101,6 +101,39 @@ values with a comment naming the decision. Do not "fix" them without asking.
 
 ## 2. Bugs found and fixed — each one shipped green
 
+### The camera scanner was never offered on desktop, or on any iPhone
+**Fixed 2026-09-11.** Camera scanning was built on the browser's own `BarcodeDetector`, and
+`cameraSupport()` returned "this browser cannot scan" when it was absent. The Shape Detection API
+has never shipped outside Android and ChromeOS, so the camera button was **not rendered at all** on
+Windows, macOS, Linux and every iOS browser — including this shop's own counter PC, whose webcam
+was working the entire time. The owner reported it as "we need to use the camera"; the feature was
+built, tested and invisible.
+
+The probe that settled it, run in the owner's Chrome 152 on Windows: `window.BarcodeDetector` is
+`undefined` while `isSecureContext` is `true`, `navigator.mediaDevices.getUserMedia` is a function,
+and `enumerateDevices` lists one camera. **Every condition for a camera was met; only the decoder
+was missing — and that is the one thing the code refused on.**
+
+Feature-detecting the API was right. Treating its absence as a verdict on the *browser* was not:
+a decoder is a library you can ship. `@zxing/library` is now the fallback behind a one-method
+`BarcodeDetectorLike` seam, dynamically imported so it costs nothing to anyone who never opens the
+camera, and resolved *before* `getUserMedia` is called so a failed import cannot leave someone
+having granted a camera permission for a feature that never worked.
+
+**Why the suite was worse than useless here.** happy-dom has no `BarcodeDetector` either, so the
+environment agreed with the bug: the tests asserted the refusal and passed. *A test that asserts a
+refusal is only as strong as the reason for refusing*, and this one wrote the wrong reason down and
+then defended it. `barcode-camera.test.ts` now asserts the inverse — with no `BarcodeDetector`,
+support must be `{ available: true }` — and decodes hand-encoded EAN-13 and Code 39 frames back
+through the wrapper. Break-tested both ways.
+
+**Verified by driving a real browser, again.** A canvas holding a seeded product's EAN-13 was piped
+into the live `<video>` with `canvas.captureStream(15)` while the scanner ran; the sheet closed on
+its own and the cart read "AA batteries 4pk — ETB 95.00". That covers `drawImage` off a real video
+element, which happy-dom cannot do, and it confirmed in a browser that closing the sheet leaves the
+camera track `"ended"`. Worth reusing for any camera feature: no props, no human, repeatable.
+Detail in `docs/findings/slice6-camera-scanning.md`.
+
 ### 24 links-that-look-like-buttons were announced and keyed as buttons
 **Fixed 2026-09-10.** Every "New sale", "Back to products", "Import" and empty-state action in
 the product was `<Button render={<Link href={…} />}>`. Base UI's `Button` has exactly two modes

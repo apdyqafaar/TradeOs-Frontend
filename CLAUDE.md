@@ -15,7 +15,7 @@ debt creation; the product import wizard (`2e`); reports (`2i`); members and rol
 settings and account (`2k`); projects and the public client page (`2l`); announcements and the
 Help Center (`2m`).
 
-Verified 2026-09-10: **1000 tests / 109 files**, tsc and biome clean.
+Verified 2026-09-11: **1149 tests / 122 files**, tsc and biome clean.
 
 **A whole-product pass was driven in a real authenticated browser** on 2026-09-10 against a live
 backend, after the last slice landed — every top-level screen, in both light and dark. What it
