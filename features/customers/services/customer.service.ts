@@ -15,6 +15,7 @@ import type {
   CustomerDetail,
   CustomerDetailResponse,
   CustomerListParams,
+  ListedCustomer,
 } from "../types";
 
 /**
@@ -46,7 +47,8 @@ const BASE = "/customers";
  */
 export const list = (
   params: CustomerListParams,
-): Promise<Paginated<Customer>> => apiGetList<Customer>(BASE, { params });
+): Promise<Paginated<ListedCustomer>> =>
+  apiGetList<ListedCustomer>(BASE, { params });
 
 /**
  * `GET /customers/:id` — `customers:view`.

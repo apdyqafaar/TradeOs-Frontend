@@ -3,6 +3,7 @@
 import { cn } from "cn";
 import { Plus, Search, Users } from "lucide-react";
 import {
+  parseAsBoolean,
   parseAsInteger,
   parseAsString,
   parseAsStringLiteral,
@@ -17,11 +18,29 @@ import { useCan } from "@/features/auth/hooks/use-permission";
 import { CustomerFormSheet } from "@/features/customers/components/customer-form-sheet";
 import { CustomerTable } from "@/features/customers/components/customer-table";
 import { useCustomers } from "@/features/customers/hooks/use-customers";
-import type { CustomerListParams } from "@/features/customers/types";
+import {
+  CUSTOMER_SORTS,
+  type CustomerListParams,
+} from "@/features/customers/types";
 import { useOrganization } from "@/features/organization/hooks/use-organization";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 
 const STATUS_FILTERS = ["active", "archived", "all"] as const;
+
+/**
+ * What each ranking is called on screen.
+ *
+ * Plain questions rather than field names: a shopkeeper asks "who owes me the
+ * most", not "sort by outstanding descending". Typed against
+ * `CUSTOMER_SORTS` so a fifth sort cannot be added to the API mirror without
+ * being labelled here.
+ */
+const CUSTOMER_SORT_LABELS: Record<(typeof CUSTOMER_SORTS)[number], string> = {
+  name: "Name (A–Z)",
+  outstanding: "Owes the most",
+  overdue: "Most overdue",
+  sales: "Buys the most",
+};
 
 const STATUS_LABELS: Record<(typeof STATUS_FILTERS)[number], string> = {
   active: "Active",
@@ -49,6 +68,23 @@ const STATUS_LABELS: Record<(typeof STATUS_FILTERS)[number], string> = {
 const CUSTOMER_FILTER_PARSERS = {
   search: parseAsString.withDefault(""),
   status: parseAsStringLiteral(STATUS_FILTERS).withDefault("active"),
+  /**
+   * Added 2026-09-11, for "who owes me the most" and "who buys the most".
+   *
+   * `name` is the default on both sides, so the ordinary list still has a bare
+   * query string. The other three are **aggregate sorts**: the server joins
+   * Debt and Sale, computes, sorts and only then paginates, because sorting a
+   * page that has already been fetched sorts 25 rows and lies about every
+   * other page.
+   */
+  sort: parseAsStringLiteral(CUSTOMER_SORTS).withDefault("name"),
+  /**
+   * Only customers with at least one overdue debt — the collections worklist.
+   *
+   * Distinct from `sort=overdue`, which ranks everybody by how much is overdue
+   * and still lists the people who owe nothing.
+   */
+  overdueOnly: parseAsBoolean.withDefault(false),
   page: parseAsInteger.withDefault(1),
   limit: parseAsInteger.withDefault(25),
 };
@@ -94,6 +130,21 @@ function toCustomerListParams(filters: CustomerFilters): CustomerListParams {
     limit: filters.limit,
     status: filters.status,
     ...(search === "" ? {} : { search }),
+    sort: filters.sort,
+    /*
+     * `order` is sent explicitly rather than left to the server's per-sort
+     * default, so the request says what it wants. The defaults agree with
+     * these: A→Z is what a name list means, and the point of ranking by money
+     * is to see the biggest first.
+     */
+    order: filters.sort === "name" ? "asc" : "desc",
+    /*
+     * Sent only when true. The server accepts `hasOverdue=false` and treats it
+     * as "no filter", but these params are the React Query key too, and
+     * `{ hasOverdue: false }` and `{}` hash differently — two cache entries
+     * for one identical request.
+     */
+    ...(filters.overdueOnly ? { hasOverdue: true } : {}),
   };
 }
 
@@ -145,7 +196,7 @@ export function CustomersPage() {
    * lands, and a date that changes under the reader is worse than a skeleton
    * that lasts a moment longer.
    */
-  const { timezone, isLoading: organizationLoading } = useOrganization();
+  const { currency, isLoading: organizationLoading } = useOrganization();
 
   const customers = useCustomers(toCustomerListParams(filters));
   const { data, error, isPending, isPlaceholderData, refetch } = customers;
@@ -237,7 +288,7 @@ export function CustomersPage() {
         <CustomerTable
           rows={data?.items ?? []}
           meta={data?.meta}
-          timezone={timezone}
+          currency={currency}
           isLoading={isPending || organizationLoading}
           isStale={isPlaceholderData}
           emptyState={emptyState}
@@ -364,6 +415,57 @@ function CustomerFiltersBar({ filters, setFilters }: CustomerFiltersProps) {
           </option>
         ))}
       </select>
+
+      {/*
+        The owner's three questions — who owes the most, who is overdue, who
+        buys the most — are one control, because they are one question asked
+        three ways: "rank my customers by what matters right now."
+      */}
+      <label className="sr-only" htmlFor="customer-sort">
+        Order
+      </label>
+      <select
+        id="customer-sort"
+        value={filters.sort}
+        onChange={(event) =>
+          void setFilters({
+            sort: event.target.value as CustomerFilters["sort"],
+            // Page 1: row 26 of the alphabet is not row 26 of the debt
+            // ranking, and the two lists share nothing.
+            page: 1,
+          })
+        }
+        className={cn(CONTROL, "px-3")}
+      >
+        {CUSTOMER_SORTS.map((sort) => (
+          <option key={sort} value={sort}>
+            {CUSTOMER_SORT_LABELS[sort]}
+          </option>
+        ))}
+      </select>
+
+      {/*
+        A filter, not a sort: `sort=overdue` ranks everybody by how much is
+        overdue and still lists the people who owe nothing at all. This is the
+        list to phone today.
+      */}
+      <label
+        className={cn(
+          CONTROL,
+          "flex cursor-pointer items-center gap-2 px-3 text-[13px]",
+          filters.overdueOnly && "border-primary bg-primary-soft",
+        )}
+      >
+        <input
+          type="checkbox"
+          checked={filters.overdueOnly}
+          onChange={(event) =>
+            void setFilters({ overdueOnly: event.target.checked, page: 1 })
+          }
+          className="size-3.5 accent-primary"
+        />
+        Overdue only
+      </label>
     </div>
   );
 }

@@ -8,9 +8,9 @@ import {
   type DataTableColumn,
 } from "@/components/shared/data-table";
 import { ROUTES } from "@/config/routes";
-import type { Customer } from "@/features/customers/types";
+import type { Customer, ListedCustomer } from "@/features/customers/types";
 import type { PageMeta } from "@/lib/api/types";
-import { formatDate } from "@/lib/format/date";
+import { formatMoney } from "@/lib/format/money";
 
 const STATUS_STYLES: Record<Customer["status"], string> = {
   active: "bg-success-soft text-success-strong",
@@ -26,16 +26,20 @@ const STATUS_LABELS: Record<Customer["status"], string> = {
 const ABSENT = "—";
 
 interface CustomerTableProps {
-  rows: Customer[];
+  rows: ListedCustomer[];
   /** Absent until the first page has landed. */
   meta?: PageMeta;
   /**
-   * The **business's** IANA zone, from `useOrganization()`. `createdAt` is an
-   * ISO string and `formatDate` takes the zone as a required argument for the
-   * reason `CLAUDE.md` gives: a customer added at 23:30 in Nairobi belongs to
-   * that day for the shop even when the owner is reading the list from London.
+   * The business's **main currency code**, from `useOrganization()`.
+   *
+   * Replaced `timezone` on 2026-09-11 when the Created column gave way to
+   * Owes and Bought. Every figure in `stats` is a sum of `Debt.remaining` or
+   * `Sale.total`, both stored in the main currency, so nothing here converts —
+   * but it is still passed rather than assumed, because this market mixes
+   * currencies whose symbols collide and the code is what disambiguates them
+   * (`CLAUDE.md`: money is 2 dp with the currency CODE, never a symbol).
    */
-  timezone: string;
+  currency: string;
   isLoading: boolean;
   /** A refetch is in flight over rows already on screen: dim, do not blank. */
   isStale: boolean;
@@ -52,23 +56,29 @@ interface CustomerTableProps {
  * needs `meta.total` for the count beside the title and would otherwise have to
  * run it twice.
  *
- * **There is no balance column, and there must not be one.** `GET /customers`
- * answers `publicCustomer`, which is nine fields and none of them is money —
- * the debt figures come from `GET /customers/:id`, whose `debtSummary` is
- * computed per customer by an aggregate. A balance column here would mean one
- * extra request per row, and the only number available to fake it with
- * (`totalRemaining`) is not on the wire at all. The canvas agrees: Name, Phone,
- * Email, Address, Created, Status.
+ * **Owes and Bought are new, and this file used to argue they were
+ * impossible.** It said there could be no money column at all: `GET /customers`
+ * answered `publicCustomer`, nine fields and none of them money, so a balance
+ * would have meant one extra request per row. That was true and is no longer —
+ * every row now carries a `stats` object the server computes for the whole page
+ * in one pass (2026-09-11). The reasoning was sound; the premise moved.
  *
- * **No column is sortable.** `listCustomersQuerySchema` is `.strict()` and
- * accepts `page`, `limit`, `search` and `status` — there is no `sort` key, so
- * `<DataTable>`'s sorting props are deliberately not passed. Sorting the 25
- * rows in memory would silently reorder one page of N and lie about the rest.
+ * They displaced **Address** and **Created**, which the canvas draws and which
+ * nobody reads on a list whose purpose is now "who owes me, and who buys from
+ * me". Both are still on the customer's own page.
+ *
+ * **No column header is clickable, and that is still deliberate.** The list IS
+ * sortable now — `?sort=` takes `name`, `outstanding`, `overdue` and `sales` —
+ * but the control for it lives in the filter bar, not on the headers. Only
+ * three of these six columns can be sorted by, and headers that look alike
+ * while three of them silently do nothing are worse than a control that lists
+ * exactly what it offers. Sorting the 25 rows in memory remains the thing that
+ * must never happen: it reorders one page of N and lies about the rest.
  */
 export function CustomerTable({
   rows,
   meta,
-  timezone,
+  currency,
   isLoading,
   isStale,
   emptyState,
@@ -77,7 +87,7 @@ export function CustomerTable({
 }: CustomerTableProps) {
   const router = useRouter();
 
-  const columns: DataTableColumn<Customer>[] = [
+  const columns: DataTableColumn<ListedCustomer>[] = [
     {
       key: "name",
       header: "Name",
@@ -112,24 +122,61 @@ export function CustomerTable({
       ),
     },
     {
-      key: "address",
-      header: "Address",
-      hideBelowMd: true,
-      cell: (customer) => (
-        <span className="block truncate text-[13px] text-muted-foreground">
-          {customer.address ?? ABSENT}
-        </span>
-      ),
+      key: "outstanding",
+      header: "Owes",
+      align: "end",
+      /*
+       * The number the "Owes the most" and "Most overdue" rankings sort by.
+       * A sort by a figure the row does not show is not a usable screen —
+       * the reader has to take the order on trust and cannot tell a leader
+       * from a tie.
+       *
+       * The overdue part is called out rather than shown as a separate
+       * column: what a shopkeeper needs at a glance is "how much, and is any
+       * of it late", and two money columns side by side invites reading them
+       * as a total.
+       */
+      cell: (customer) => {
+        const { outstanding, overdueAmount, overdueCount } = customer.stats;
+        if (outstanding === 0) {
+          return <span className="text-[13px] text-muted-2">{ABSENT}</span>;
+        }
+        return (
+          <span className="flex flex-col items-end gap-0.5">
+            <span className="font-mono text-[13px] text-foreground">
+              {formatMoney(outstanding, currency)}
+            </span>
+            {overdueCount > 0 ? (
+              <span className="font-mono text-[11px] text-destructive-strong">
+                {formatMoney(overdueAmount, currency)} overdue
+              </span>
+            ) : null}
+          </span>
+        );
+      },
     },
     {
-      key: "createdAt",
-      header: "Created",
+      key: "salesTotal",
+      header: "Bought",
+      align: "end",
       hideBelowMd: true,
-      cell: (customer) => (
-        <span className="font-mono text-xs text-muted-foreground">
-          {formatDate(customer.createdAt, timezone)}
-        </span>
-      ),
+      /* What "Buys the most" ranks by. Completed sales only — a voided sale
+         is not a sale, and counting one would make the best customer the one
+         whose sales were reversed. */
+      cell: (customer) =>
+        customer.stats.salesCount === 0 ? (
+          <span className="text-[13px] text-muted-2">{ABSENT}</span>
+        ) : (
+          <span className="flex flex-col items-end gap-0.5">
+            <span className="font-mono text-[13px] text-foreground">
+              {formatMoney(customer.stats.salesTotal, currency)}
+            </span>
+            <span className="font-mono text-[11px] text-muted-2">
+              {customer.stats.salesCount}
+              {customer.stats.salesCount === 1 ? " sale" : " sales"}
+            </span>
+          </span>
+        ),
     },
     {
       key: "status",

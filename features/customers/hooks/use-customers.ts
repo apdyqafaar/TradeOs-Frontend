@@ -7,7 +7,10 @@ import {
 } from "@tanstack/react-query";
 import { customerKeys } from "@/features/customers/keys";
 import * as customerService from "@/features/customers/services/customer.service";
-import type { Customer, CustomerListParams } from "@/features/customers/types";
+import type {
+  CustomerListParams,
+  ListedCustomer,
+} from "@/features/customers/types";
 import type { ApiError } from "@/lib/api/errors";
 import type { Paginated } from "@/lib/api/types";
 
@@ -29,8 +32,8 @@ import type { Paginated } from "@/lib/api/types";
  */
 export function useCustomers(
   params: CustomerListParams = {},
-): UseQueryResult<Paginated<Customer>, ApiError> {
-  return useQuery<Paginated<Customer>, ApiError>({
+): UseQueryResult<Paginated<ListedCustomer>, ApiError> {
+  return useQuery<Paginated<ListedCustomer>, ApiError>({
     queryKey: customerKeys.list(params),
     queryFn: () => customerService.list(params),
     // Page and filters are part of the key, so every page turn and every
