@@ -2,10 +2,11 @@
 
 import { type RefObject, useEffect, useRef, useState } from "react";
 import {
+  type BarcodeDetectorLike,
   CAMERA_CONSTRAINTS,
   type CameraSupport,
   cameraSupport,
-  createBarcodeDetector,
+  loadDetector,
   setTorch,
   stopStream,
   torchTrack,
@@ -142,9 +143,11 @@ export function useCameraScanner({
     let lastValue = "";
     let lastAt = 0;
 
-    // Constructed once per run, not per frame: `new BarcodeDetector()`
-    // allocates a decoder for each format it is asked for.
-    const detector = createBarcodeDetector();
+    // Resolved once per run, not per frame: a decoder allocates state for
+    // every format it is asked for, and the ZXing one is a dynamic import.
+    // `let`, because it is awaited inside `start()` — the frame loop reads it
+    // only after that await has resolved.
+    let detector: BarcodeDetectorLike | null = null;
 
     const release = () => {
       cancelled = true;
@@ -167,10 +170,22 @@ export function useCameraScanner({
     };
 
     const start = async () => {
+      /*
+       * The decoder BEFORE the camera, deliberately.
+       *
+       * `loadDetector()` may be a dynamic `import()` of ZXing — a real
+       * download on the first scan of a session. Asking for the camera first
+       * would light the lens up and hold it while that lands, and if the
+       * import then failed the shopkeeper would have granted a permission for
+       * a feature that never worked.
+       */
+      detector = await loadDetector();
+      if (cancelled) return;
+
       if (!detector) {
-        // The button that opens this is not offered without a detector, so
-        // reaching here means the constructor refused our format list. Asking
-        // for the camera anyway would light it up to read nothing.
+        // No native detector AND the fallback would not load — an offline
+        // first scan, or a blocked chunk. Asking for the camera now would
+        // light it up to read nothing.
         setStatus("failed");
         return;
       }

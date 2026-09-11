@@ -77,9 +77,12 @@ export interface DetectedBarcode {
  *
  * Declared here rather than imported: as of TypeScript 5.x `lib.dom.d.ts` has
  * no `BarcodeDetector`, because the Shape Detection API is not on a standards
- * track any implementer has finished. Writing the shape out is also the seam a
- * bundled decoder would plug into — see `docs/findings/slice6-camera-scanning.md`
- * for why one is not bundled today.
+ * track any implementer has finished.
+ *
+ * It is also the seam the **ZXing fallback** plugs into. Writing the shape out
+ * rather than importing it is what lets a library decoder and the browser's own
+ * look identical to everything above them: the frame loop, the repeat guard and
+ * the stream lifecycle are written once and neither knows which one it has.
  */
 export interface BarcodeDetectorLike {
   detect(source: CanvasImageSource): Promise<DetectedBarcode[]>;
@@ -97,13 +100,13 @@ function detectorConstructor(): BarcodeDetectorConstructor | null {
 }
 
 /**
- * A detector for `BARCODE_FORMATS`, or `null` if this browser has none.
+ * The **browser's own** detector for `BARCODE_FORMATS`, or `null` if it has
+ * none — which is most browsers. Prefer `loadDetector()`, which falls back.
  *
  * The constructor is allowed to throw: the spec says a `TypeError` for an
  * empty or unknown format list, and an implementation that supports the API
  * but not one of the six would reject the whole list rather than narrow it.
- * A `null` here surfaces as "this browser cannot scan", which is true, instead
- * of an unhandled rejection inside the frame loop.
+ * A `null` here means "use the fallback", not "this browser cannot scan".
  */
 export function createBarcodeDetector(): BarcodeDetectorLike | null {
   const Detector = detectorConstructor();
@@ -116,13 +119,162 @@ export function createBarcodeDetector(): BarcodeDetectorLike | null {
   }
 }
 
+/**
+ * A canvas to draw video frames onto, reused for the life of one scanner.
+ *
+ * ZXing decodes pixels, not elements, so every frame has to be drawn somewhere
+ * first. A canvas per frame would mean six throwaway canvases a second on a
+ * phone that is already running a camera.
+ *
+ * `willReadFrequently` is the one option that matters here: without it Chrome
+ * keeps the canvas on the GPU and every `getImageData` is a synchronous
+ * read-back across the bus.
+ */
+function frameCanvas(): {
+  canvas: HTMLCanvasElement;
+  context: CanvasRenderingContext2D;
+} | null {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  return context ? { canvas, context } : null;
+}
+
+/**
+ * The ZXing decoder, wrapped to look exactly like `BarcodeDetector`.
+ *
+ * **Loaded with a dynamic `import()`, deliberately.** `@zxing/library` is a
+ * large dependency and the counter is the screen a shift starts on; nobody who
+ * never opens the camera should pay to download it. This runs when the scanner
+ * opens, not when the module is imported, so the bundler gives it its own
+ * chunk.
+ *
+ * Formats are pinned to the ones a shop actually carries. Left unrestricted,
+ * ZXing tries every symbology it knows on every frame — including PDF417 and
+ * Data Matrix, which are not on a tin of tomatoes — and a mid-range phone
+ * spends its whole frame budget failing to find them.
+ *
+ * Returns `null` rather than throwing when the import fails (an offline first
+ * load, a blocked chunk), so the caller reports "the camera could not be
+ * started" instead of dying inside the frame loop.
+ */
+export async function loadZxingDetector(): Promise<BarcodeDetectorLike | null> {
+  let zxing: typeof import("@zxing/library");
+  try {
+    zxing = await import("@zxing/library");
+  } catch {
+    return null;
+  }
+
+  const {
+    BarcodeFormat,
+    BinaryBitmap,
+    DecodeHintType,
+    HybridBinarizer,
+    MultiFormatReader,
+    RGBLuminanceSource,
+  } = zxing;
+
+  const reader = new MultiFormatReader();
+  reader.setHints(
+    new Map<number, unknown>([
+      [
+        DecodeHintType.POSSIBLE_FORMATS,
+        [
+          BarcodeFormat.EAN_13,
+          BarcodeFormat.EAN_8,
+          BarcodeFormat.UPC_A,
+          BarcodeFormat.UPC_E,
+          BarcodeFormat.CODE_128,
+          BarcodeFormat.CODE_39,
+          // Exactly the six in `BARCODE_FORMATS` above, and for the reasons
+          // given there. ITF in particular is left out on purpose: it is a
+          // CARTON code, so reading the outer box would ring up one unit for
+          // a case of twelve.
+        ],
+      ],
+      // A shelf barcode is usually straight and lit. `TRY_HARDER` roughly
+      // doubles the work per frame to catch the rotated and damaged ones, and
+      // six ordinary frames a second beat three thorough ones at a counter.
+      [DecodeHintType.TRY_HARDER, false],
+    ]),
+  );
+
+  const surface = frameCanvas();
+  if (!surface) return null;
+  const { canvas, context } = surface;
+
+  return {
+    async detect(source: CanvasImageSource): Promise<DetectedBarcode[]> {
+      const video = source as HTMLVideoElement;
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+
+      // The first frames of every stream have no dimensions yet. Drawing a
+      // 0×0 frame throws inside `getImageData`, and the loop would swallow
+      // that as "no barcode" for ever if the size never arrived.
+      if (!width || !height) return [];
+
+      if (canvas.width !== width) canvas.width = width;
+      if (canvas.height !== height) canvas.height = height;
+      context.drawImage(video, 0, 0, width, height);
+
+      const { data } = context.getImageData(0, 0, width, height);
+
+      // `RGBLuminanceSource` takes one luminance byte per pixel; `getImageData`
+      // gives four. Packed here rather than handed over raw so the alpha
+      // channel — always 255 from a video frame — is dropped instead of being
+      // read as brightness.
+      const luminance = new Uint8ClampedArray(width * height);
+      for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+        // Rec. 601 luma, integer-only: this runs a million times per frame.
+        luminance[p] =
+          ((data[i] ?? 0) * 77 +
+            (data[i + 1] ?? 0) * 150 +
+            (data[i + 2] ?? 0) * 29) >>
+          8;
+      }
+
+      try {
+        const bitmap = new BinaryBitmap(
+          new HybridBinarizer(new RGBLuminanceSource(luminance, width, height)),
+        );
+        const result = reader.decode(bitmap);
+        const text = result.getText();
+        return text
+          ? [{ rawValue: text, format: String(result.getBarcodeFormat()) }]
+          : [];
+      } catch {
+        // `NotFoundException` on a frame with no barcode in it — which is most
+        // frames, and is not an error.
+        return [];
+      } finally {
+        reader.reset();
+      }
+    },
+  };
+}
+
+/**
+ * The best decoder this browser can give us.
+ *
+ * Native first: it is hardware-accelerated where it exists and costs no
+ * download. ZXing when there is none — which is **every desktop Chrome, every
+ * Firefox and every iPhone**.
+ *
+ * `BarcodeDetector` ships on Android and ChromeOS only, and assuming otherwise
+ * is what previously hid the camera button on the very machine this shop
+ * develops and serves from. Feature-detecting it was right; treating its
+ * absence as "this browser cannot scan" was not.
+ */
+export async function loadDetector(): Promise<BarcodeDetectorLike | null> {
+  return createBarcodeDetector() ?? (await loadZxingDetector());
+}
+
 export type CameraUnavailableReason =
   /** Served over plain HTTP from something that is not `localhost`. */
   | "insecure-context"
   /** No `getUserMedia` at all — an old browser, or a locked-down webview. */
-  | "no-camera-api"
-  /** A camera, but no `BarcodeDetector`: Safari, every iPhone, Firefox. */
-  | "no-detector";
+  | "no-camera-api";
 
 export type CameraSupport =
   | { available: true }
@@ -144,6 +296,14 @@ export type CameraSupport =
  * boolean: it is `undefined` in environments that do not implement it (happy-dom
  * is one), and treating "unknown" as "insecure" would print the wrong sentence
  * everywhere the property is merely missing.
+ *
+ * **A missing `BarcodeDetector` is no longer a reason to refuse.** It used to
+ * be, and that was a real mistake: the API ships on Android and ChromeOS only,
+ * so desktop Chrome — the machine a shop's own counter PC runs, and the one
+ * this was developed on — was told it could not scan while its webcam sat
+ * there working. Decoding is now the fallback's problem (`loadDetector`), and
+ * the only questions left are the two this genuinely cannot answer for itself:
+ * is there a camera API, and are we allowed to use it here.
  */
 export function cameraSupport(): CameraSupport {
   if (typeof window === "undefined" || typeof navigator === "undefined") {
@@ -157,9 +317,6 @@ export function cameraSupport(): CameraSupport {
     return { available: false, reason: "insecure-context" };
   }
   if (!hasCamera) return { available: false, reason: "no-camera-api" };
-  if (!detectorConstructor()) {
-    return { available: false, reason: "no-detector" };
-  }
 
   return { available: true };
 }

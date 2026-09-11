@@ -212,11 +212,18 @@ export function CatalogPane({
           and then disagree with the client, which is a hydration mismatch on
           the one screen that must not flicker.
 
-          A button that opens a camera and then silently never decodes is worse
-          than no button, so an iPhone (no `BarcodeDetector`) and a phone on a
-          plain-HTTP LAN address (no secure context) both get nothing here. The
-          laser scanner and typing the barcode work everywhere and are what
-          this field is for.
+          What is left to hide it for is narrow, and that is the point. This
+          used to also require `BarcodeDetector`, which ships on Android and
+          ChromeOS **only** — so desktop Chrome, Firefox and every iPhone were
+          told they could not scan while their cameras sat there working, this
+          shop's own counter PC among them. Decoding is now the fallback's job
+          (`loadDetector`), and the one case still worth withholding a button
+          for is a phone pointed at a plain-HTTP LAN address: no secure context
+          means no `getUserMedia` at all, and a camera button that cannot open
+          a camera is worse than none.
+
+          The laser scanner and typing the barcode work everywhere regardless,
+          and are what this field is for.
         */}
         {cameraSupport?.available ? (
           <button
