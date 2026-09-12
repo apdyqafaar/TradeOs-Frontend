@@ -52,9 +52,17 @@ export function AnnouncementsSection({
                   aria-label="Pinned"
                 />
               ) : null}
-              <span className="flex-1 truncate text-[13px] text-foreground">
+              {/* The title is the link, matching `<ProjectsSection>`: the
+                  Overview is a set of entry points, and a notice you can read
+                  three lines of but not open is a dead end. No permission check
+                  around it — `announcements:view` is held by every preset, which
+                  is why this whole section has no gate either. */}
+              <Link
+                href={ROUTES.announcement(announcement.id)}
+                className="flex-1 truncate text-[13px] text-foreground hover:underline"
+              >
                 {announcement.title}
-              </span>
+              </Link>
               <span className="hidden flex-none text-xs text-muted-foreground sm:inline">
                 {announcement.author.name}
               </span>

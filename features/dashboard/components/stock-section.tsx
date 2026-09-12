@@ -62,9 +62,15 @@ export function StockSection({ section }: StockSectionProps) {
                 key={product.productId}
                 className="flex h-11 items-center justify-between gap-3 border-b border-border/60 px-[18px] last:border-b-0"
               >
-                <span className="truncate text-[13px] text-foreground">
+                {/* Straight to the product, because the reason this row is on
+                    screen is that someone has to restock it, and that is done
+                    on the product's own page. */}
+                <Link
+                  href={ROUTES.product(product.productId)}
+                  className="truncate text-[13px] text-foreground hover:underline"
+                >
                   {product.name}
-                </span>
+                </Link>
                 <span className="flex flex-none items-center gap-2">
                   {/* `threshold` is `number | null` — a product can be tracked
                       without one, and "0" would be a different, wrong claim. */}

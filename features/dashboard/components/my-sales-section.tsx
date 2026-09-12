@@ -135,9 +135,16 @@ export function MySalesSection({
                   key={sale.id}
                   className="grid h-12 grid-cols-[1fr_auto] items-center gap-3 border-b border-border/60 px-[18px] last:border-b-0 sm:grid-cols-[1fr_0.6fr_0.9fr_0.9fr]"
                 >
-                  <span className="truncate font-mono text-[13px] text-foreground">
+                  {/* The receipt number opens the receipt. It is the cell a
+                      cashier is already looking for — "what was that last
+                      sale?" — and `sales:view` is in the Seller preset, so
+                      everyone who can see this section can open what it lists. */}
+                  <Link
+                    href={ROUTES.sale(sale.id)}
+                    className="truncate font-mono text-[13px] text-foreground hover:underline"
+                  >
                     {sale.number}
-                  </span>
+                  </Link>
                   <span className="hidden font-mono text-xs text-muted-foreground sm:inline">
                     {formatTime(sale.createdAt, timezone)}
                   </span>

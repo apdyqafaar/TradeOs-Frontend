@@ -132,9 +132,18 @@ export function DebtsSection({ section, money, timezone }: DebtsSectionProps) {
                 <span className="flex min-w-0 flex-col">
                   {/* The backend falls both fields back to "" when the customer
                       row has gone, so neither may be rendered bare. */}
-                  <span className="truncate text-[13px] text-foreground">
+                  {/* Links to the DEBT, not the customer. This row exists
+                      because something is overdue, and the next action is
+                      against that account — recording a payment or reading its
+                      history — not browsing the person. `debtId` is on the row
+                      for exactly this; the customer has their own page, reached
+                      from the debt. */}
+                  <Link
+                    href={ROUTES.debt(debt.debtId)}
+                    className="truncate text-[13px] text-foreground hover:underline"
+                  >
                     {debt.customer.name || "Unnamed customer"}
-                  </span>
+                  </Link>
                   {debt.customer.phone ? (
                     <span className="truncate font-mono text-[11px] text-muted-foreground">
                       {debt.customer.phone}
