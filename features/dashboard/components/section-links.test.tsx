@@ -256,13 +256,7 @@ describe("InsightsSection", () => {
     // `section === null` alone used to produce this copy, which told a shop
     // that had already enabled the digest to go and enable it. `ai.enabled` is
     // what decides it now; the link still goes to the same place.
-    render(
-      <InsightsSection
-        section={null}
-        ai={{ enabled: false, hourLocal: 21 }}
-        canConfigureAi
-      />,
-    );
+    render(<InsightsSection section={null} aiEnabled={false} canConfigureAi />);
     expect(screen.getByText(/daily digest is off/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /ai insights/i })).toHaveAttribute(
       "href",
@@ -337,31 +331,26 @@ describe("InsightsSection", () => {
  * three states on the other screen.
  */
 describe("InsightsSection — off, on-but-waiting, and not-known-yet", () => {
-  it("names the arrival hour, and never says to turn it on, once the digest IS enabled", () => {
-    render(
-      <InsightsSection
-        section={null}
-        ai={{ enabled: true, hourLocal: 20 }}
-        canConfigureAi
-      />,
-    );
-    expect(screen.getByText(/20:00 tonight/)).toBeInTheDocument();
+  it("says tonight's is still coming, and never says to turn it on, once the digest IS enabled", () => {
+    // No hour named: `organization.ai` on the dashboard payload carries only
+    // `enabled` — deliberately, since that section reaches every member
+    // regardless of permission — so the exact time is not on this screen and
+    // guessing it would be another confident, wrong sentence. `/insights`
+    // names it, one click away.
+    render(<InsightsSection section={null} aiEnabled canConfigureAi />);
+    expect(
+      screen.getByText(/tonight's arrives after your closing hour/i),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/turn it on/i)).not.toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: /ai insights/i }),
     ).not.toBeInTheDocument();
   });
 
-  it("never names an arrival time while the digest is off", () => {
-    render(
-      <InsightsSection
-        section={null}
-        ai={{ enabled: false, hourLocal: 21 }}
-        canConfigureAi
-      />,
-    );
-    expect(screen.queryByText(/21:00/)).not.toBeInTheDocument();
+  it("never says anything is arriving while the digest is off", () => {
+    render(<InsightsSection section={null} aiEnabled={false} canConfigureAi />);
     expect(screen.queryByText(/tonight/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/closing hour/i)).not.toBeInTheDocument();
   });
 
   it("gives a member who cannot open Settings the sentence without the dead link", () => {
@@ -371,7 +360,7 @@ describe("InsightsSection — off, on-but-waiting, and not-known-yet", () => {
     render(
       <InsightsSection
         section={null}
-        ai={{ enabled: false, hourLocal: 21 }}
+        aiEnabled={false}
         canConfigureAi={false}
       />,
     );
@@ -380,10 +369,15 @@ describe("InsightsSection — off, on-but-waiting, and not-known-yet", () => {
     expect(screen.queryByRole("link", { name: /ai insights/i })).toBeNull();
   });
 
-  it("promises nothing at all while the AI settings are not known", () => {
-    // `GET /organizations/current` is gated `organization:view` and can 403
-    // for a custom role holding only `reports:view`. Neither "it is off" nor
-    // "it arrives at 21:00" is known to be true, so the strip says neither.
+  it("promises nothing at all when the API did not send ai.enabled", () => {
+    // NOT a permission case and not a loading one, on this screen: the
+    // `organization` section needs no permission and is built for every
+    // caller, `GET /dashboard` is itself gated `organization:view` so
+    // everyone who sees this strip holds it, and `Overview` does not render
+    // this component until the response has arrived. What is left is deploy
+    // skew — a frontend newer than the API build that added the field
+    // (`Backend` a7a365e). Neither "it is off" nor "tonight's is coming" is
+    // known to be true, so the strip says neither.
     render(<InsightsSection section={null} />);
     expect(screen.getByText(/no digest yet/i)).toBeInTheDocument();
     expect(screen.queryByText(/tonight/i)).not.toBeInTheDocument();
@@ -401,7 +395,7 @@ describe("InsightsSection — off, on-but-waiting, and not-known-yet", () => {
           status: "complete",
           headline: "A steady Saturday",
         }}
-        ai={{ enabled: false, hourLocal: 21 }}
+        aiEnabled={false}
         canConfigureAi
       />,
     );

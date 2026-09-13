@@ -68,9 +68,25 @@ export function InsightsScreen() {
       </div>
       {/* Not offered while the feature is known to be off: the POST can only
           answer 409, and the message it would then print contradicts the rest
-          of this screen. Still offered when `ai` is `null`, because that is
-          "unknown", not "off". */}
-      {canRun && ai?.enabled !== false ? (
+          of this screen.
+
+          Nor while the profile is still in flight. `ai === null` means both
+          "the profile 403'd" and "it has not arrived yet", and offering the
+          button during the second is finding 1 narrowed to the load window
+          rather than removed: an owner of an AI-off shop opening this page
+          cold on a slow connection can click Generate, get the 409, and read
+          "Turn on the daily digest in Settings first" beside a screen that
+          then resolves to "The daily digest is off".
+
+          Once it HAS answered, `null` means the 403 a `reports:view`-only
+          role gets from `GET /organizations/current` (gated
+          `organization:view`), and the button comes back — unknown is not
+          off, and its own 409 branch says so plainly if it turns out to be.
+
+          `isLoading`, not `isPending`: this query is disabled until the
+          session reports an organization, where `isPending` stays true for
+          ever and would hide the button permanently. */}
+      {canRun && !profile.isLoading && ai?.enabled !== false ? (
         <RunDigestButton sinceLocalDate={latest.data?.localDate ?? null} />
       ) : null}
     </div>

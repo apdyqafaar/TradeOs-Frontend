@@ -23,6 +23,25 @@ export interface DashboardOrganizationSection {
   /** IANA zone, e.g. `Africa/Nairobi`. The argument every `formatDate` call needs. */
   timezone: string;
   /**
+   * Whether the nightly AI digest is switched on. **`enabled` only** — the
+   * backend deliberately keeps `language` and `hourLocal` off this section,
+   * because it is sent to every member regardless of permission and neither
+   * is shown on the Overview (`organization.section.ts`, and its own comment
+   * says so).
+   *
+   * The Insights strip needs it because `sections.digest` is `null` both for a
+   * shop that has never switched the digest on and for one that switched it on
+   * this afternoon and is waiting for tonight's run — two states that used to
+   * be described with the same sentence. Declared here rather than read
+   * untyped so that the field disappearing upstream is a compile error; the
+   * backend pins it with two tests, one of which proves a Seller receiving no
+   * `digest` section still gets the flag.
+   *
+   * Whoever needs `hourLocal` (`/insights` does, to name the arrival hour)
+   * reads `GET /organizations/current`, which carries all three.
+   */
+  ai: { enabled: boolean };
+  /**
    * `null` when the currency config row is missing. Treat that as unknown
    * rather than falling back to a hardcoded code — this market mixes
    * currencies and the wrong one is worse than none.

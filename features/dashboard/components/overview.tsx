@@ -30,7 +30,6 @@ import { StockSection } from "@/features/dashboard/components/stock-section";
 import { TeamSection } from "@/features/dashboard/components/team-section";
 import { useDashboard } from "@/features/dashboard/hooks/use-dashboard";
 import { useOrganization } from "@/features/organization/hooks/use-organization";
-import { useOrganizationProfile } from "@/features/organization/hooks/use-organization-profile";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 import { formatDate } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
@@ -70,20 +69,6 @@ export function Overview({ name }: { name: string }) {
   const canRecordSale = useCan(PERMISSIONS.SALES_CREATE);
   const canConfigureAi = useCan(PERMISSIONS.ORGANIZATION_UPDATE);
 
-  /**
-   * `ai.enabled` for the Insights strip, and nothing else on this page.
-   *
-   * `GET /dashboard` does not carry it: `organization.section.ts` returns
-   * `{ id, name, logo, timezone, currency }` and no `ai` block, checked
-   * against the backend source rather than assumed. So the one place that
-   * needs it asks `GET /organizations/current` — the same query the Settings
-   * AI tab already uses, deduplicated under `organizationKeys.current()`.
-   * `data` stays `undefined` while it loads and if it 403s (the route is
-   * gated `organization:view`), and the strip renders that as "not known"
-   * rather than as "off".
-   */
-  const profile = useOrganizationProfile();
-
   const now = new Date();
 
   /**
@@ -111,6 +96,23 @@ export function Overview({ name }: { name: string }) {
   const team = sections?.team;
   const announcements = sections?.announcements;
   const digest = sections?.digest;
+
+  /**
+   * Whether the nightly digest is switched on, for the Insights strip.
+   *
+   * It rides along on this same response — `organization` needs no permission
+   * and is built for every caller — so the strip costs no second request. It
+   * did briefly: `GET /dashboard` carried no `ai` block until `Backend`
+   * a7a365e added one, and reading it from `GET /organizations/current`
+   * instead meant a request on the landing page for every member, including
+   * the Sellers who never receive a `digest` section at all.
+   *
+   * `?? null` covers only deploy skew — a frontend newer than the API build
+   * that added the field. The strip renders that as "not known" rather than as
+   * "off"; the type says the field is always there, and the backend pins it
+   * with two tests.
+   */
+  const aiEnabled = sections?.organization?.ai?.enabled ?? null;
 
   /**
    * The brand-new-business state of artboard `1e`.
@@ -248,7 +250,7 @@ export function Overview({ name }: { name: string }) {
           {digest !== undefined ? (
             <InsightsSection
               section={digest}
-              ai={profile.data?.ai ?? null}
+              aiEnabled={aiEnabled}
               canConfigureAi={canConfigureAi}
             />
           ) : null}

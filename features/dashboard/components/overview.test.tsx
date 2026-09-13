@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Overview } from "./overview";
 
 vi.mock("@/features/organization/hooks/use-organization", () => ({
@@ -8,25 +8,6 @@ vi.mock("@/features/organization/hooks/use-organization", () => ({
     timezone: "Africa/Nairobi",
     currency: "USD",
     isLoading: false,
-  }),
-}));
-
-/**
- * The AI settings the Insights strip reads. Mocked for the same reason
- * `useCan` is below — unmocked it reaches `useSession` and fires a real
- * `GET /auth/me` out of happy-dom — and made settable because `Overview` is
- * the only place that wires `ai.enabled` into the strip, so nothing else can
- * tell whether that wiring is real.
- */
-let aiSettings: {
-  enabled: boolean;
-  language: string;
-  hourLocal: number;
-} | null = null;
-vi.mock("@/features/organization/hooks/use-organization-profile", () => ({
-  useOrganizationProfile: () => ({
-    isLoading: false,
-    data: aiSettings ? { id: "o1", ai: aiSettings } : undefined,
   }),
 }));
 
@@ -48,10 +29,6 @@ vi.mock("@/features/auth/hooks/use-permission", () => ({
 const wrap = (ui: React.ReactNode) => (
   <QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>
 );
-
-beforeEach(() => {
-  aiSettings = null;
-});
 
 describe("Overview", () => {
   it("renders a seller's own figures and no manager analytics", () => {
@@ -163,42 +140,86 @@ describe("Overview — the Insights strip", () => {
     expect(screen.getByText(/no digest yet/i)).toBeInTheDocument();
   });
 
+  /**
+   * `sections.digest` is `null` both for a shop that has the digest switched
+   * off and for one that enabled it this afternoon and is waiting for
+   * tonight's run. Only `organization.ai.enabled` tells them apart, and
+   * `Overview` is the one place that reads it out of the payload and hands it
+   * to the strip — so without these two the read could be deleted and the
+   * strip would quietly go back to telling an enabled shop to enable it.
+   *
+   * The flag rides on `GET /dashboard` rather than a second request
+   * (`Backend` a7a365e): the `organization` section needs no permission, so
+   * this costs nothing even for the Sellers who never receive `digest`.
+   */
+  const organization = (enabled: boolean) => ({
+    id: "o1",
+    name: "Shop",
+    logo: null,
+    timezone: "Africa/Nairobi",
+    ai: { enabled },
+    currency: { main: "USD", exchange: "KES", rate: 130 },
+  });
+
   it("passes the shop's real ai.enabled to the strip rather than assuming it", () => {
-    // `sections.digest` is `null` both for a shop that has the digest switched
-    // off and for one that enabled it this afternoon and is waiting for
-    // tonight's run. Only `GET /organizations/current` tells them apart, and
-    // `Overview` is the one place that reads it — so without this test the
-    // whole `useOrganizationProfile()` call could be deleted and the strip
-    // would silently go back to telling an enabled shop to enable it.
-    aiSettings = { enabled: true, language: "en", hourLocal: 20 };
     dashboard.mockReturnValue({
       isPending: false,
       error: null,
       data: {
         available: ["organization", "me", "mySales", "digest"],
-        sections: { mySales, digest: null },
+        sections: { organization: organization(true), mySales, digest: null },
       },
     });
 
     render(wrap(<Overview name="Yusuf" />));
-    expect(screen.getByText(/20:00 tonight/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/tonight's arrives after your closing hour/i),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/turn it on/i)).not.toBeInTheDocument();
   });
 
   it("says the digest is off when the shop has never switched it on", () => {
-    aiSettings = { enabled: false, language: "en", hourLocal: 21 };
     dashboard.mockReturnValue({
       isPending: false,
       error: null,
       data: {
         available: ["organization", "me", "mySales", "digest"],
-        sections: { mySales, digest: null },
+        sections: { organization: organization(false), mySales, digest: null },
       },
     });
 
     render(wrap(<Overview name="Yusuf" />));
     expect(screen.getByText(/daily digest is off/i)).toBeInTheDocument();
     expect(screen.queryByText(/tonight/i)).not.toBeInTheDocument();
+  });
+
+  it("says neither when an older API sends no ai block at all", () => {
+    // Deploy skew: a frontend newer than the API build that added the field.
+    // The type says it is always there, so only a runtime guard catches this
+    // — and a missing flag must read as "not known", never as "off".
+    dashboard.mockReturnValue({
+      isPending: false,
+      error: null,
+      data: {
+        available: ["organization", "me", "mySales", "digest"],
+        sections: {
+          organization: {
+            id: "o1",
+            name: "Shop",
+            logo: null,
+            timezone: "Africa/Nairobi",
+            currency: null,
+          },
+          mySales,
+          digest: null,
+        },
+      },
+    });
+
+    render(wrap(<Overview name="Yusuf" />));
+    expect(screen.getByText(/no digest yet/i)).toBeInTheDocument();
+    expect(screen.queryByText(/daily digest is off/i)).toBeNull();
+    expect(screen.queryByText(/closing hour/i)).toBeNull();
   });
 
   it("renders last night's headline, linking into Insights, when a digest is present", () => {

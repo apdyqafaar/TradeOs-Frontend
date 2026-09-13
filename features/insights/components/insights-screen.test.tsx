@@ -213,3 +213,41 @@ describe("InsightsScreen — the analysts' trace", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("InsightsScreen — while the AI settings are still in flight", () => {
+  it("does not offer Generate before the profile has answered", () => {
+    // `ai === null` means BOTH "the profile 403'd" and "it has not arrived
+    // yet", and only the first of those is a reason to keep offering the
+    // button. An owner of an AI-off shop opening `/insights` cold on a slow
+    // connection could click Generate inside the load window, get a
+    // 409 AI_DISABLED_FOR_ORGANIZATION, and read "Turn on the daily digest in
+    // Settings → AI insights first" beside a screen that then resolved to
+    // "The daily digest is off" — finding 1's self-contradiction narrowed to
+    // the load window rather than removed.
+    //
+    // `isLoading`, not `isPending`: this query is disabled until the session
+    // reports an organization, and `isPending` is true for ever in that state,
+    // which would hide the button permanently rather than briefly.
+    profile = { isLoading: true, data: undefined };
+
+    render(<InsightsScreen />);
+
+    expect(
+      screen.queryByRole("button", { name: /generate/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers it again once the profile answers, even if it answered with nothing", () => {
+    // A `reports:view`-only custom role gets a 403 from
+    // `GET /organizations/current` (gated `organization:view`), so `ai` stays
+    // null for good. Unknown is not off, and the button's own 409 branch says
+    // so clearly if it turns out to be.
+    profile = { isLoading: false, data: undefined };
+
+    render(<InsightsScreen />);
+
+    expect(
+      screen.getByRole("button", { name: /generate/i }),
+    ).toBeInTheDocument();
+  });
+});

@@ -7,22 +7,6 @@ import type { DashboardDigestSection } from "@/features/dashboard/types";
 import { formatLocalDate } from "@/lib/format/date";
 
 /**
- * What the strip needs to know about the shop's AI settings, or `null` when
- * it does not know yet.
- *
- * `null` is a real third answer, not a loading nicety: `GET /dashboard`
- * carries no `ai` block on its `organization` section (checked against
- * `Backend/src/services/dashboard/organization.section.ts`), so this comes
- * from `GET /organizations/current`, which is gated on `organization:view` and
- * can 403 for a custom role holding only `reports:view`. The strip must not
- * render "we could not ask" as "it is off".
- */
-export interface InsightsAiSettings {
-  enabled: boolean;
-  hourLocal: number;
-}
-
-/**
  * One line from last night's digest, and the way in.
  *
  * It links to `/insights` rather than to the digest's own id: "last night's"
@@ -40,7 +24,7 @@ export interface InsightsAiSettings {
  * `Backend/src/services/dashboard/digest.section.ts:14` returns `null`
  * whenever no digest exists, regardless of `ai.enabled`, so this strip used to
  * tell a shop that had enabled the digest at 14:00 to go and enable it — for
- * the seven hours until the 21:05 cron landed. `ai` settles which of the three
+ * the seven hours until the 21:05 cron landed. `aiEnabled` settles which of the three
  * it is, and `features/insights/components/insights-screen.tsx` renders the
  * same three states from the same field so the two screens cannot disagree.
  *
@@ -55,12 +39,30 @@ export interface InsightsAiSettings {
  */
 export function InsightsSection({
   section,
-  ai = null,
+  aiEnabled = null,
   canConfigureAi = false,
 }: {
   section: DashboardDigestSection;
-  /** `null` until the organization profile answers — see `InsightsAiSettings`. */
-  ai?: InsightsAiSettings | null;
+  /**
+   * `sections.organization.ai.enabled` — it rides along on `GET /dashboard`,
+   * so the strip costs no second request.
+   *
+   * `null` means "not known", and on this screen that is **not** a permission
+   * outcome and not a loading one either. `organization` needs no permission
+   * and is built for every caller, `/dashboard` is itself gated
+   * `organization:view` (`Backend/src/routes/v1/dashboard.route.ts`) so
+   * everyone who reaches the strip holds it, and `Overview` does not render
+   * this component at all until the response has arrived. What is left is
+   * deploy skew: an API build older than the one that added the field
+   * (`Backend` a7a365e). The type says it is always there and the backend
+   * pins it with two tests; this branch is what keeps a stale API a quiet
+   * "No digest yet." instead of a confident, wrong "it is off".
+   *
+   * `/insights` reads the same fact from `GET /organizations/current`
+   * instead, because it also needs `hourLocal` to name the arrival hour —
+   * which this section deliberately does not carry.
+   */
+  aiEnabled?: boolean | null;
   /**
    * `organization:update`. Defaults to `false`: a control the viewer cannot
    * use is worse than no control, so the link is opt-in rather than opt-out.
@@ -86,7 +88,7 @@ export function InsightsSection({
           aria-hidden="true"
         />
         {section === null ? (
-          <NoDigestYet ai={ai} canConfigureAi={canConfigureAi} />
+          <NoDigestYet aiEnabled={aiEnabled} canConfigureAi={canConfigureAi} />
         ) : section.status === "failed" || !section.headline ? (
           <Line>
             Last night's digest could not be written.{" "}
@@ -132,17 +134,17 @@ function InsightsLink({ children }: { children: ReactNode }) {
 }
 
 function NoDigestYet({
-  ai,
+  aiEnabled,
   canConfigureAi,
 }: {
-  ai: InsightsAiSettings | null;
+  aiEnabled: boolean | null;
   canConfigureAi: boolean;
 }) {
-  if (ai === null) {
+  if (aiEnabled === null) {
     return <Line>No digest yet.</Line>;
   }
 
-  if (!ai.enabled) {
+  if (!aiEnabled) {
     return (
       <Line>
         The daily digest is off.{" "}
@@ -168,10 +170,10 @@ function NoDigestYet({
     );
   }
 
-  return (
-    <Line>
-      No digest yet. Your first one arrives at{" "}
-      {String(ai.hourLocal).padStart(2, "0")}:00 tonight.
-    </Line>
-  );
+  // No hour named here, deliberately: `organization.ai` carries only
+  // `enabled`, so the exact time is not on this screen's payload and guessing
+  // it would be another confident, wrong sentence. "Closing hour" is what
+  // Settings calls the field the run follows, so that is what this calls it;
+  // `/insights` names the hour itself, one click away.
+  return <Line>No digest yet. Tonight's arrives after your closing hour.</Line>;
 }
