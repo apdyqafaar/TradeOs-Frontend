@@ -1,5 +1,6 @@
 import type {
   CreateOrganizationInput,
+  UpdateAiSettingsInput,
   UpdateCurrencyInput,
   UpdateOrganizationInput,
 } from "@/features/organization/schemas/organization.schema";
@@ -84,3 +85,12 @@ export const updateCurrencyConfig = (
   input: UpdateCurrencyInput,
 ): Promise<CurrencyConfig> =>
   apiPatch<CurrencyConfig>("/organizations/current/currency", input);
+
+/**
+ * `PATCH /organizations/current/ai` — `organization:update`. Answers the
+ * whole `publicOrganization`, same as `updateOrganization`.
+ */
+export const updateAiSettings = (
+  input: UpdateAiSettingsInput,
+): Promise<Organization> =>
+  apiPatch<Organization>("/organizations/current/ai", input);

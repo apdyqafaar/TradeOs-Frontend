@@ -9,6 +9,7 @@ import {
   Package,
   Receipt,
   Settings,
+  Sparkles,
   Users,
   UsersRound,
 } from "lucide-react";
@@ -53,6 +54,8 @@ export const ROUTES = {
   reportsDebts: "/reports/debts",
   reportsCustomers: "/reports/customers",
   reportsStaff: "/reports/staff",
+  insights: "/insights",
+  insight: (id: string) => `/insights/${id}`,
   announcements: "/announcements",
   /**
    * The reading screen for one notice. Deliberately absent from
@@ -155,6 +158,12 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: ChartNoAxesColumn,
         permission: PERMISSIONS.REPORTS_VIEW,
       },
+      {
+        label: "Insights",
+        href: ROUTES.insights,
+        icon: Sparkles,
+        permission: PERMISSIONS.REPORTS_VIEW,
+      },
     ],
   },
   {
@@ -250,6 +259,7 @@ export const ROUTE_PERMISSIONS: Readonly<Record<string, Permission>> = {
   // debt book would otherwise reach a form whose every submit is a 403.
   [ROUTES.debtNew]: PERMISSIONS.DEBTS_CREATE,
   [ROUTES.reports]: PERMISSIONS.REPORTS_VIEW,
+  [ROUTES.insights]: PERMISSIONS.REPORTS_VIEW,
   [ROUTES.projects]: PERMISSIONS.PROJECTS_VIEW,
   [ROUTES.team]: PERMISSIONS.MEMBERS_INVITE,
   [ROUTES.teamRoles]: PERMISSIONS.ROLES_VIEW,

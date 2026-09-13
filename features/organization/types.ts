@@ -29,12 +29,29 @@ export interface Organization {
   /** Public URL derived from `logoUploadId`; absent until a logo is attached. */
   logo?: string;
   status: OrganizationStatus;
+  ai: AiSettings;
   /** ISO 8601 string, not a `Date` — JSON has no date type. */
   createdAt: string;
 }
 
 /** `organization.model.ts`: the enum is exactly these two. */
 export type OrganizationStatus = "active" | "suspended";
+
+export const AI_LANGUAGES = ["en", "so", "sw", "am"] as const;
+export type AiLanguage = (typeof AI_LANGUAGES)[number];
+export const AI_LANGUAGE_LABELS: Record<AiLanguage, string> = {
+  en: "English",
+  so: "Somali",
+  sw: "Swahili",
+  am: "Amharic",
+};
+
+/** Mirrors `Organization.ai` (Backend spec §4.1). */
+export interface AiSettings {
+  enabled: boolean;
+  language: AiLanguage;
+  hourLocal: number;
+}
 
 /**
  * `publicCurrency` — `GET /organizations/current/currency`.

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isSupportedTimezone } from "@/features/organization/lib/timezones";
+import { AI_LANGUAGES } from "@/features/organization/types";
 
 /**
  * MIRROR OF `Backend/src/validators/organization.validation.ts`.
@@ -175,3 +176,24 @@ export const updateCurrencySchema = z
   });
 
 export type UpdateCurrencyInput = z.infer<typeof updateCurrencySchema>;
+
+/**
+ * `PATCH /organizations/current/ai` — every field optional, but at least one
+ * required, same shape as the backend's partial-update refusal on the other
+ * two PATCHes here (`updateOrganizationSchema`, `updateCurrencySchema`).
+ * `.strict()` because this endpoint has no unknown-key stripping precedent to
+ * mirror the way `updateOrganizationSchema` does — see `Organization.ai`
+ * (Backend spec §4.1).
+ */
+export const updateAiSettingsSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    language: z.enum(AI_LANGUAGES).optional(),
+    hourLocal: z.number().int().min(0).max(23).optional(),
+  })
+  .strict()
+  .refine((d) => Object.keys(d).length > 0, {
+    message: "Change at least one setting",
+  });
+
+export type UpdateAiSettingsInput = z.infer<typeof updateAiSettingsSchema>;

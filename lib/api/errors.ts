@@ -93,6 +93,10 @@ export const API_ERROR_CODE = Object.freeze({
   // Organizations.
   SEED_MISSING: "SEED_MISSING",
 
+  // AI digest — `Organization.ai` and `/digests/*`.
+  AI_NOT_CONFIGURED: "AI_NOT_CONFIGURED",
+  AI_DISABLED_FOR_ORGANIZATION: "AI_DISABLED_FOR_ORGANIZATION",
+
   // Periods — every `from`/`to` endpoint in the API, which is the twelve
   // reports plus the sales, debts and customers lists.
   //

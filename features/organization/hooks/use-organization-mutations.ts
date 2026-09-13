@@ -8,10 +8,12 @@ import {
 import { authKeys } from "@/features/auth/keys";
 import { organizationKeys } from "@/features/organization/keys";
 import type {
+  UpdateAiSettingsInput,
   UpdateCurrencyInput,
   UpdateOrganizationInput,
 } from "@/features/organization/schemas/organization.schema";
 import {
+  updateAiSettings,
   updateCurrencyConfig,
   updateOrganization,
 } from "@/features/organization/services/organization.service";
@@ -86,6 +88,29 @@ export function useUpdateCurrencyConfig(): UseMutationResult<
     mutationFn: updateCurrencyConfig,
     onSuccess: (currency) => {
       queryClient.setQueryData(organizationKeys.currency(), currency);
+    },
+  });
+}
+
+/**
+ * `PATCH /organizations/current/ai` — the Insights settings form.
+ *
+ * Invalidates the whole slice rather than seeding `organizationKeys.current()`
+ * directly: `organizationKeys.all` is `["organizations"]`, which
+ * `invalidateQueries` matches as a prefix against every key this feature
+ * caches, so a form that only knows about `ai` does not need to know the
+ * `current()`/`currency()` split to invalidate correctly.
+ */
+export function useUpdateAiSettings(): UseMutationResult<
+  Organization,
+  ApiError,
+  UpdateAiSettingsInput
+> {
+  const queryClient = useQueryClient();
+  return useMutation<Organization, ApiError, UpdateAiSettingsInput>({
+    mutationFn: updateAiSettings,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: organizationKeys.all });
     },
   });
 }

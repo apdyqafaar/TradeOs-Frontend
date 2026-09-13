@@ -1,6 +1,6 @@
 # API route map
 
-**All 112 endpoints, extracted from `../Backend/src/routes/v1/*.route.ts` on 2026-09-07 (plus `GET /uploads/:id`, added 2026-09-09) and
+**All 112 endpoints, extracted from `../Backend/src/routes/v1/*.route.ts` on 2026-09-07 (plus `GET /uploads/:id`, added 2026-09-09, and the five AI digest endpoints below, added 2026-09-13) and
 verified against the source, not from memory.** This is the contract the frontend codes against.
 
 ## Rules
@@ -128,6 +128,15 @@ answers 200 with the original `readAt` on a repeat.
 | POST | `/debts/:id/write-off` | debts:write_off |
 | POST | `/payments/:id/void` | payments:void |
 
+### features/insights
+
+| Method | Path | Requires |
+|---|---|---|
+| GET | `/digests` | reports:view |
+| GET | `/digests/latest` | reports:view |
+| GET | `/digests/:id` | reports:view |
+| POST | `/digests/run` | organization:update |
+
 ### features/organization
 
 | Method | Path | Requires |
@@ -135,6 +144,7 @@ answers 200 with the original `readAt` on a repeat.
 | POST | `/organizations` | session only + verified email |
 | GET | `/organizations/current` | organization:view |
 | PATCH | `/organizations/current` | organization:update |
+| PATCH | `/organizations/current/ai` | organization:update |
 | GET | `/organizations/current/currency` | organization:view |
 | PATCH | `/organizations/current/currency` | organization:update |
 
