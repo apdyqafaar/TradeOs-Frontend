@@ -516,6 +516,49 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
   },
   {
+    id: "reading-your-evening-insights",
+    title: "Reading your evening insights",
+    section: "business",
+    summary:
+      "What the digest covers, why a partial one still tells the truth, and how to generate one early.",
+    keywords: [
+      "digest",
+      "ai",
+      "evening report",
+      "summary",
+      "closing hour",
+      "analysts",
+      "generate",
+    ],
+    body: [
+      {
+        kind: "text",
+        text: "Insights writes a short report from that day's own figures — sales, debts, stock and your team — once a day. It reads like a person wrote it, but every number in it comes straight from what actually happened at the counter.",
+      },
+      {
+        kind: "text",
+        text: "It runs on its own at the closing hour you set, and you do not have to wait for it. Press Generate now on the Insights page to write one from today's figures right away.",
+      },
+      {
+        kind: "steps",
+        items: [
+          "Open Settings → AI insights.",
+          "Turn the daily digest on or off.",
+          "Choose the language it is written in.",
+          'Set the closing hour — the point in your day it treats as "today is done".',
+        ],
+      },
+      {
+        kind: "note",
+        text: "A digest can stop early — a budget or a step limit, or an error partway through. When that happens it says so plainly rather than pretending to be complete, and names which section it could not finish.",
+      },
+      {
+        kind: "text",
+        text: 'Open "What the analysts looked at" under any digest to see the actual figures behind what it wrote — the questions it asked and the numbers it was shown, not just the sentences it produced from them.',
+      },
+    ],
+  },
+  {
     id: "your-account-and-security",
     title: "Your account and signing in",
     section: "people",
