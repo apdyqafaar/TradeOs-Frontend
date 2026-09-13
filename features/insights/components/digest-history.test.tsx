@@ -66,7 +66,7 @@ describe("DigestHistory", () => {
       isPending: false,
     };
 
-    render(<DigestHistory timezone="Africa/Addis_Ababa" />);
+    render(<DigestHistory />);
 
     expect(screen.getByRole("link", { name: /12 Sep 2026/ })).toHaveAttribute(
       "href",
@@ -82,7 +82,7 @@ describe("DigestHistory", () => {
       isPending: false,
     };
 
-    render(<DigestHistory timezone="Africa/Addis_Ababa" />);
+    render(<DigestHistory />);
 
     expect(screen.getByRole("alert")).toHaveTextContent(/req_5/);
     expect(
@@ -105,11 +105,43 @@ describe("DigestHistory", () => {
       isPending: false,
     };
 
-    render(<DigestHistory timezone="Africa/Addis_Ababa" />);
+    render(<DigestHistory />);
 
     expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /try again/i }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("DigestHistory — each row is stamped in its own timezone", () => {
+  it("renders the exact-instant tooltip in the zone the digest was written in", () => {
+    // Each row stores its zone (`Backend/src/db/models/digest.model.ts:32`)
+    // precisely so history stays truthful. Rendering it in the organization's
+    // CURRENT zone meant that correcting a wrong timezone in Settings moved
+    // every historical row's tooltip: a digest written at 22:06 on the 12th
+    // in New York showed as "13 Sep 2026 01:06" beside a `localDate` column
+    // still reading "12 Sep 2026" — one row contradicting itself.
+    query = {
+      data: {
+        items: [
+          {
+            ...summary(),
+            id: "d9",
+            localDate: "2026-09-12",
+            timezone: "America/New_York",
+            createdAt: "2026-09-13T02:06:00.000Z",
+          },
+        ],
+        meta: { page: 1, totalPages: 1 },
+      },
+      error: null,
+      isPending: false,
+    };
+
+    render(<DigestHistory />);
+
+    const row = screen.getByRole("link", { name: /12 Sep 2026/ });
+    expect(row).toHaveAttribute("title", "12 Sep 2026 22:06");
   });
 });

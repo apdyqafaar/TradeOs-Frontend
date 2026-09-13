@@ -9,7 +9,6 @@ import { ROUTES } from "@/config/routes";
 import { DigestView } from "@/features/insights/components/digest-view";
 import { TraceView } from "@/features/insights/components/trace-view";
 import { useDigest } from "@/features/insights/hooks/use-digests";
-import { useOrganization } from "@/features/organization/hooks/use-organization";
 
 /**
  * One digest, by id — `/insights/:id`, reached from the history list.
@@ -20,7 +19,6 @@ import { useOrganization } from "@/features/organization/hooks/use-organization"
  */
 export function DigestDetail({ id }: { id: string }) {
   const digest = useDigest(id);
-  const { timezone, isLoading: organizationLoading } = useOrganization();
 
   const back = (
     <ButtonLink variant="ghost" href={ROUTES.insights}>
@@ -71,7 +69,7 @@ export function DigestDetail({ id }: { id: string }) {
   // components on this feature agree on one predicate — and a skeleton rather
   // than the `return null` that used to sit here, which rendered a completely
   // blank content area with not even the way back on it.
-  if (digest.isPending || organizationLoading || !digest.data) {
+  if (digest.isPending || !digest.data) {
     return (
       <div className="flex flex-col gap-6">
         {back}
@@ -83,7 +81,7 @@ export function DigestDetail({ id }: { id: string }) {
   return (
     <div className="flex flex-col gap-6">
       {back}
-      <DigestView digest={digest.data} timezone={timezone} />
+      <DigestView digest={digest.data} />
       <section className="flex flex-col gap-3">
         <h2 className="font-mono text-[10px] text-muted-foreground uppercase tracking-[0.08em]">
           What the analysts looked at

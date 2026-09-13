@@ -12,7 +12,6 @@ import { DigestView } from "@/features/insights/components/digest-view";
 import { RunDigestButton } from "@/features/insights/components/run-digest-button";
 import { TraceView } from "@/features/insights/components/trace-view";
 import { useLatestDigest } from "@/features/insights/hooks/use-digests";
-import { useOrganization } from "@/features/organization/hooks/use-organization";
 import { useOrganizationProfile } from "@/features/organization/hooks/use-organization-profile";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 
@@ -43,7 +42,6 @@ import { PERMISSIONS } from "@/lib/auth/permissions";
  */
 export function InsightsScreen() {
   const latest = useLatestDigest();
-  const { timezone, isLoading: organizationLoading } = useOrganization();
   const profile = useOrganizationProfile();
   const canRun = useCan(PERMISSIONS.ORGANIZATION_UPDATE);
 
@@ -90,7 +88,7 @@ export function InsightsScreen() {
   // disabled until the session reports an organization, and a disabled query
   // reports `isPending: true` for ever — that one would be a skeleton with no
   // end rather than a skeleton with a wrong caption.
-  if (latest.isPending || organizationLoading || profile.isLoading) {
+  if (latest.isPending || profile.isLoading) {
     return (
       <div className="flex flex-col gap-6">
         {header}
@@ -118,7 +116,7 @@ export function InsightsScreen() {
       {header}
       {latest.data ? (
         <>
-          <DigestView digest={latest.data} timezone={timezone} />
+          <DigestView digest={latest.data} />
           <section className="flex flex-col gap-3">
             <h2 className="font-mono text-[10px] text-muted-foreground uppercase tracking-[0.08em]">
               What the analysts looked at
@@ -134,7 +132,7 @@ export function InsightsScreen() {
       ) : (
         <NoDigestYet ai={ai} canConfigure={canRun} />
       )}
-      <DigestHistory timezone={timezone} />
+      <DigestHistory />
     </div>
   );
 }

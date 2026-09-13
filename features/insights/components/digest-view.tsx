@@ -1,6 +1,7 @@
 import { cn } from "cn";
 import { AlertTriangle } from "lucide-react";
 import type { ReactNode } from "react";
+import { DigestStatusBadge } from "@/features/insights/components/digest-status";
 import type {
   Digest,
   RecommendationAction,
@@ -13,6 +14,43 @@ const PRIORITY: Record<RecommendationAction["priority"], string> = {
   medium: "bg-warning-soft text-warning-strong",
   low: "bg-muted text-muted-foreground",
 };
+
+/**
+ * The priority, as a word.
+ *
+ * The pill used to read `action.kind` and carry `action.priority` only in its
+ * colour, so `{high, chase, "Call Hodan Traders"}` and `{low, chase, "Call
+ * Juma Kiosk"}` announced identically to a screen reader and differed only in
+ * hue for everyone else — on the one card whose entire purpose is ranking
+ * tomorrow's work. WCAG 1.4.1.
+ */
+const PRIORITY_LABEL: Record<RecommendationAction["priority"], string> = {
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+};
+
+/**
+ * The day, the status, and — when a run stopped short of the full five — why.
+ *
+ * `status` was rendered nowhere on `/insights` before, only in the history
+ * list underneath, so the same digest was labelled "Failed" below and
+ * unlabelled in the panel above it. Spec §11 asks for both shown honestly.
+ */
+function Header({ digest }: { digest: Digest }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground text-xs">
+      <span>{formatDate(digest.generatedAt, digest.timezone)}</span>
+      <DigestStatusBadge status={digest.status} />
+      {digest.status !== "failed" && digest.stoppedBy !== "complete" ? (
+        <span>
+          Stopped early ({digest.stoppedBy}) — the sections below are what the
+          analysts finished.
+        </span>
+      ) : null}
+    </div>
+  );
+}
 
 /** One of the five boxes on the page. Plain container, no logic of its own. */
 function Card({ title, children }: { title: string; children: ReactNode }) {
@@ -31,16 +69,23 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
  * not finish before the run stopped (Backend spec §8, `stoppedBy`). The
  * numbers in every *other* card are still real; this just says which one is
  * missing and why it can be missing at all.
+ *
+ * `reason` is the matching entry from `digest.errors[]`, which the backend
+ * writes one of per section that did not submit (spec §7.3) and which this
+ * screen used to carry all the way through the types and into the fixture
+ * before dropping it unrendered.
  */
-function Missing({ what }: { what: SectionKey }) {
+function Missing({ what, reason }: { what: SectionKey; reason?: string }) {
   return (
-    <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
+    <p className="flex items-start gap-2 text-[13px] text-muted-foreground">
       <AlertTriangle
-        className="size-4 flex-none text-warning-strong"
+        className="mt-0.5 size-4 flex-none text-warning-strong"
         aria-hidden="true"
       />
-      The {what} section could not be written last night — the rest of this
-      digest is still real.
+      <span>
+        The {what} section could not be written last night
+        {reason ? ` — ${reason}` : ""}. The rest of this digest is still real.
+      </span>
     </p>
   );
 }
@@ -90,12 +135,6 @@ function WhyList({ rows }: { rows: { name: string; why: string }[] }) {
   );
 }
 
-export interface DigestViewProps {
-  digest: Digest;
-  /** IANA zone from `useOrganization()`. There is no safe default. */
-  timezone: string;
-}
-
 /**
  * The five cards a shop owner actually reads: Sales · Debts · Stock · Team &
  * projects · What to do tomorrow.
@@ -108,19 +147,72 @@ export interface DigestViewProps {
  * (`"budget"`, `"hops"`, `"error"` — Backend spec §8). A `null` section is not
  * an error state to apologise for; it is an honest "this part did not finish",
  * and the sections that did finish are exactly as real as they would be on a
- * complete run.
+ * complete run — **unless the whole run failed**, which is its own branch
+ * below.
+ *
+ * The date is rendered in `digest.timezone`, the zone this digest was written
+ * in, not the organization's current one. Each row stores it
+ * (`Backend/src/db/models/digest.model.ts:32`) precisely so that correcting a
+ * wrong timezone in Settings does not make every historical row's rendered
+ * time disagree with its own `localDate`. There is deliberately no `timezone`
+ * prop, so reaching for the wrong zone is a compile error rather than a quiet
+ * bug — the same reasoning as `insights-section.tsx`.
  */
-export function DigestView({ digest, timezone }: DigestViewProps) {
+export function DigestView({ digest }: { digest: Digest }) {
   const { sales, debts, stock, team, recommendations } = digest.sections;
+  const reasonFor = (section: SectionKey) =>
+    digest.errors.find((entry) => entry.section === section)?.message;
+
+  // Spec §4.2 defines `failed` as "none" — the backend's own fixture for a
+  // failed run writes all five sections `null` — and this used to render
+  // "Stopped early (error) — the sections below are what the analysts
+  // finished" above five cards each reassuring the reader that "the rest of
+  // this digest is still real". Nothing is real; there is no rest.
+  //
+  // `status` decides, not the sections: nothing yet enforces that a `failed`
+  // run leaves all five `null`, because the orchestrator that assigns
+  // `status` is a separate, later task — and the Overview strip already
+  // resolves the same ambiguity the same way (`insights-section.tsx`, and the
+  // "status decides, not headline" case in `section-links.test.tsx`).
+  if (digest.status === "failed") {
+    return (
+      <div className="flex flex-col gap-4">
+        <Header digest={digest} />
+        <Card title="Last night's run">
+          <p className="text-[13px] text-foreground leading-relaxed">
+            This digest could not be written. The run stopped (
+            {digest.stoppedBy}) before the analysts finished anything, so there
+            is nothing here to read.
+          </p>
+          {digest.errors.length > 0 ? (
+            <ul className="flex flex-col gap-1.5">
+              {digest.errors.map((entry, index) => (
+                <li
+                  // biome-ignore lint/suspicious/noArrayIndexKey: one entry per section that did not submit, carrying no id; the same section can appear more than once and the list is never reordered independently of the digest.
+                  key={index}
+                  className="flex flex-wrap items-baseline gap-x-1.5 text-[13px] leading-relaxed"
+                >
+                  <span className="font-medium text-foreground">
+                    {entry.section}
+                  </span>
+                  <span className="text-muted-foreground">
+                    — {entry.message}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <p className="text-[13px] text-muted-foreground">
+            Tonight's automatic run is unaffected.
+          </p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-muted-foreground text-xs">
-        {formatDate(digest.generatedAt, timezone)}
-        {digest.stoppedBy !== "complete"
-          ? ` · Stopped early (${digest.stoppedBy}) — the sections below are what the analysts finished.`
-          : null}
-      </p>
+      <Header digest={digest} />
 
       <Card title="Sales">
         {sales ? (
@@ -137,7 +229,7 @@ export function DigestView({ digest, timezone }: DigestViewProps) {
             ) : null}
           </>
         ) : (
-          <Missing what="sales" />
+          <Missing what="sales" reason={reasonFor("sales")} />
         )}
       </Card>
 
@@ -158,7 +250,7 @@ export function DigestView({ digest, timezone }: DigestViewProps) {
             ) : null}
           </>
         ) : (
-          <Missing what="debts" />
+          <Missing what="debts" reason={reasonFor("debts")} />
         )}
       </Card>
 
@@ -179,7 +271,7 @@ export function DigestView({ digest, timezone }: DigestViewProps) {
             ) : null}
           </>
         ) : (
-          <Missing what="stock" />
+          <Missing what="stock" reason={reasonFor("stock")} />
         )}
       </Card>
 
@@ -193,7 +285,7 @@ export function DigestView({ digest, timezone }: DigestViewProps) {
             {team.projects.length > 0 ? <Lines items={team.projects} /> : null}
           </>
         ) : (
-          <Missing what="team" />
+          <Missing what="team" reason={reasonFor("team")} />
         )}
       </Card>
 
@@ -201,9 +293,10 @@ export function DigestView({ digest, timezone }: DigestViewProps) {
         {recommendations ? (
           <>
             <ol className="flex flex-col gap-2">
-              {recommendations.actions.map((action) => (
+              {recommendations.actions.map((action, index) => (
                 <li
-                  key={`${action.kind}:${action.text}`}
+                  // biome-ignore lint/suspicious/noArrayIndexKey: the same reasoning `Lines` and `WhyList` above carry — an action is model-written text with no id, and nothing in the advisor's prompt stops it emitting the same {kind, text} twice, which keying by content turned into two identical keys in one <ol>.
+                  key={index}
                   className="flex items-start gap-2 text-[13px] text-foreground"
                 >
                   <span
@@ -212,7 +305,7 @@ export function DigestView({ digest, timezone }: DigestViewProps) {
                       PRIORITY[action.priority],
                     )}
                   >
-                    {action.kind}
+                    {PRIORITY_LABEL[action.priority]} · {action.kind}
                   </span>
                   <span className="leading-relaxed">{action.text}</span>
                 </li>
@@ -223,7 +316,10 @@ export function DigestView({ digest, timezone }: DigestViewProps) {
             ) : null}
           </>
         ) : (
-          <Missing what="recommendations" />
+          <Missing
+            what="recommendations"
+            reason={reasonFor("recommendations")}
+          />
         )}
       </Card>
     </div>

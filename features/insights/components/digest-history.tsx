@@ -1,6 +1,5 @@
 "use client";
 
-import { cn } from "cn";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -10,23 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ROUTES } from "@/config/routes";
 import { SectionStrip } from "@/features/dashboard/components/section-strip";
+import { DigestStatusBadge } from "@/features/insights/components/digest-status";
 import { useDigests } from "@/features/insights/hooks/use-digests";
-import type { DigestStatus, DigestSummary } from "@/features/insights/types";
+import type { DigestSummary } from "@/features/insights/types";
 import { formatDateTime, formatLocalDate } from "@/lib/format/date";
 
 const PAGE_SIZE = 10;
 const SKELETON_ROWS = 3;
-
-const STATUS_STYLES: Record<DigestStatus, string> = {
-  complete: "bg-success-soft text-success-strong",
-  partial: "bg-warning-soft text-warning-strong",
-  failed: "bg-destructive-soft text-destructive-strong",
-};
-const STATUS_LABELS: Record<DigestStatus, string> = {
-  complete: "Complete",
-  partial: "Partial",
-  failed: "Failed",
-};
 
 /** The first headline a member would actually read, whichever section wrote one. */
 function headlineOf(summary: DigestSummary): string {
@@ -39,16 +28,20 @@ function headlineOf(summary: DigestSummary): string {
   );
 }
 
-export interface DigestHistoryProps {
-  /** IANA zone from `useOrganization()`. Used for the row's exact-instant tooltip. */
-  timezone: string;
-}
-
 /**
  * Every digest that has ever run, newest first — the record `/insights`
  * itself only shows the latest one of.
+ *
+ * No `timezone` prop: each row's exact-instant tooltip is rendered in
+ * `item.timezone`, the zone THAT digest was written in
+ * (`Backend/src/db/models/digest.model.ts:32`), not the organization's current
+ * one. Correcting a wrong timezone in Settings used to move every historical
+ * row's tooltip, so a digest stamped 21:00 on the 12th showed as "13 Sep 2026
+ * 00:00" beside a `localDate` column reading "12 Sep 2026" — the same row
+ * contradicting itself. Dropping the parameter makes reaching for the wrong
+ * zone a compile error, as `insights-section.tsx` already does for dates.
  */
-export function DigestHistory({ timezone }: DigestHistoryProps) {
+export function DigestHistory() {
   const [page, setPage] = useState(1);
   const { data, error, isPending, refetch } = useDigests(page, PAGE_SIZE);
 
@@ -116,19 +109,12 @@ export function DigestHistory({ timezone }: DigestHistoryProps) {
             >
               <Link
                 href={ROUTES.insight(item.id)}
-                title={formatDateTime(item.createdAt, timezone)}
+                title={formatDateTime(item.createdAt, item.timezone)}
                 className="w-[110px] flex-none rounded-sm font-mono text-[12px] text-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 {formatLocalDate(item.localDate)}
               </Link>
-              <span
-                className={cn(
-                  "inline-flex h-[20px] flex-none items-center rounded-lg px-2 font-mono text-[10px] uppercase",
-                  STATUS_STYLES[item.status],
-                )}
-              >
-                {STATUS_LABELS[item.status]}
-              </span>
+              <DigestStatusBadge status={item.status} />
               <span className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground">
                 {headlineOf(item)}
               </span>

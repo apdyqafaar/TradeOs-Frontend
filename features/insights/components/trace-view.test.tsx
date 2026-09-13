@@ -59,3 +59,28 @@ describe("TraceView", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("TraceView — each row's disclosure names its own tool", () => {
+  it("gives every summary a distinct accessible name", () => {
+    // Spec §7.4 caps a trace at 30 hops, and every one of them used to read
+    // "Parameters and result": thirty identically-named expandable controls
+    // in a row, with the agent/tool/summary sitting in a sibling <div> that
+    // is not part of the control's name.
+    render(
+      <TraceView
+        trace={[
+          call({ seq: 1, tool: "getDailySales" }),
+          call({ seq: 2, tool: "getLowStock" }),
+        ]}
+      />,
+    );
+
+    const names = screen
+      .getAllByText(/parameters and result/i)
+      .map((node) => node.textContent);
+    expect(names).toHaveLength(2);
+    expect(new Set(names).size).toBe(2);
+    expect(names[0]).toMatch(/getDailySales/);
+    expect(names[1]).toMatch(/getLowStock/);
+  });
+});

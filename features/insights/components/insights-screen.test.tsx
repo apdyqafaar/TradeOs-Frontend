@@ -47,14 +47,6 @@ vi.mock("@/features/organization/hooks/use-organization-profile", () => ({
   useOrganizationProfile: () => profile,
 }));
 
-vi.mock("@/features/organization/hooks/use-organization", () => ({
-  useOrganization: () => ({
-    timezone: "Africa/Addis_Ababa",
-    currency: "ETB",
-    isLoading: false,
-  }),
-}));
-
 vi.mock("@/features/auth/hooks/use-permission", () => ({
   useCan: () => canRun,
   usePermissions: () => ["*"],

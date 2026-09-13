@@ -15,14 +15,6 @@ vi.mock("@/features/insights/hooks/use-digests", () => ({
   useDigest: () => ({ ...query, refetch }),
 }));
 
-vi.mock("@/features/organization/hooks/use-organization", () => ({
-  useOrganization: () => ({
-    timezone: "Africa/Addis_Ababa",
-    currency: "ETB",
-    isLoading: false,
-  }),
-}));
-
 beforeEach(() => {
   refetch.mockClear();
   query = { data: undefined, error: null, isPending: false };

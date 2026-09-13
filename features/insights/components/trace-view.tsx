@@ -26,8 +26,12 @@ export function TraceView({ trace }: { trace: ToolTrace[] }) {
             </span>
           </div>
           <details>
+            {/* The tool's name is in the summary, not only in the sibling
+                <div> above: a 30-hop trace (spec §7.4 caps it there) gave a
+                screen-reader user thirty identically-named expandable
+                controls with nothing to tell them apart. */}
             <summary className="cursor-pointer text-xs text-muted-foreground">
-              Parameters and result
+              {t.tool} — parameters and result
             </summary>
             <pre className="mt-2 overflow-x-auto rounded-md bg-muted p-3 font-mono text-[11px] text-foreground leading-relaxed">
               {JSON.stringify({ input: t.input, output: t.output }, null, 2)}
