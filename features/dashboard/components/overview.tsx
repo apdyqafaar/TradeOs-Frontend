@@ -18,6 +18,7 @@ import {
   FirstStepsCard,
   NothingToChartYet,
 } from "@/features/dashboard/components/first-steps-card";
+import { InsightsSection } from "@/features/dashboard/components/insights-section";
 import { MySalesSection } from "@/features/dashboard/components/my-sales-section";
 import { ProjectsSection } from "@/features/dashboard/components/projects-section";
 import {
@@ -93,6 +94,7 @@ export function Overview({ name }: { name: string }) {
   const projects = sections?.projects;
   const team = sections?.team;
   const announcements = sections?.announcements;
+  const digest = sections?.digest;
 
   /**
    * The brand-new-business state of artboard `1e`.
@@ -223,6 +225,12 @@ export function Overview({ name }: { name: string }) {
                 <ProjectsSection section={projects} timezone={timezone} />
               ) : null}
             </Band>
+          ) : null}
+
+          {/* `undefined` = the API withheld the section (no `reports:view`). `null` =
+              it was sent and there is no digest yet. Only the first means render nothing. */}
+          {digest !== undefined ? (
+            <InsightsSection section={digest} timezone={timezone} />
           ) : null}
 
           {announcements !== undefined || team !== undefined ? (

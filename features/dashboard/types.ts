@@ -191,6 +191,19 @@ export interface DashboardTeamSection {
 }
 
 /**
+ * `digest.section.ts`. Needs `reports:view`.
+ *
+ * `null` when the shop has no digest yet — distinct from the key being absent,
+ * which is how the API says the caller may not see this section at all.
+ */
+export type DashboardDigestSection = {
+  id: string;
+  localDate: string;
+  status: "complete" | "partial" | "failed";
+  headline: string | null;
+} | null;
+
+/**
  * Every section the endpoint can return, keyed exactly as the backend registry
  * keys them, in the registry's own fixed order.
  */
@@ -205,6 +218,7 @@ export interface DashboardSections {
   staff: DashboardStaffSection;
   projects: DashboardProjectsSection;
   team: DashboardTeamSection;
+  digest: DashboardDigestSection;
 }
 
 /** `"sales" | "debts" | …` — the ten keys, as a type. */

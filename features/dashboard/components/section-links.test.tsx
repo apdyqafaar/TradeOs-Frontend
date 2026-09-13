@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { AnnouncementsSection } from "./announcements-section";
 import { DebtsSection } from "./debts-section";
+import { InsightsSection } from "./insights-section";
 import { MySalesSection } from "./my-sales-section";
 import { ProjectsSection } from "./projects-section";
 import { StockSection } from "./stock-section";
@@ -187,5 +188,62 @@ describe("Overview rows link to the item, not the list", () => {
       "href",
       "/announcements",
     );
+  });
+});
+
+describe("InsightsSection", () => {
+  it("opens the Insights page from last night's headline", () => {
+    render(
+      <InsightsSection
+        timezone={TZ}
+        section={{
+          id: "d1",
+          localDate: "2026-09-12",
+          status: "complete",
+          headline: "A steady Saturday",
+        }}
+      />,
+    );
+    expect(
+      screen.getByRole("link", { name: "A steady Saturday" }),
+    ).toHaveAttribute("href", "/insights");
+  });
+
+  it("says so when last night's digest could not be written, and still offers a way in", () => {
+    render(
+      <InsightsSection
+        timezone={TZ}
+        section={{
+          id: "d2",
+          localDate: "2026-09-12",
+          status: "failed",
+          headline: null,
+        }}
+      />,
+    );
+    expect(screen.getByText(/could not be written/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /generate one now/i }),
+    ).toHaveAttribute("href", "/insights");
+  });
+
+  it("points a shop with no digest yet at the setting that turns it on", () => {
+    render(<InsightsSection timezone={TZ} section={null} />);
+    expect(screen.getByText(/no digest yet/i)).toBeInTheDocument();
+  });
+
+  it("marks a partial digest as partial rather than passing it off as complete", () => {
+    render(
+      <InsightsSection
+        timezone={TZ}
+        section={{
+          id: "d3",
+          localDate: "2026-09-12",
+          status: "partial",
+          headline: "Half a day",
+        }}
+      />,
+    );
+    expect(screen.getByText(/partial/i)).toBeInTheDocument();
   });
 });
