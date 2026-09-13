@@ -36,6 +36,11 @@ const STATUS_LABELS: Record<DigestStatus, string> = {
  * name the previous day west of Greenwich (see `bucketLabel` in
  * `features/reports/lib/format.ts`), so the parts are rebuilt as a local
  * calendar date instead of going through `new Date(string)`.
+ *
+ * **Do not "simplify" this to `formatDate(item.localDate, timezone)`.** It
+ * looks equivalent and passes for any zone at or east of UTC; it silently
+ * prints the day before for a business west of it. This repo has already
+ * shipped that exact bug once — `bucketLabel`'s docblock is the postmortem.
  */
 function formatLocalDate(value: string): string {
   const [year, month, day] = value.split("-").map(Number);
