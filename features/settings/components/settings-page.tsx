@@ -2,6 +2,7 @@
 
 import { cn } from "cn";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
+import { AiForm } from "./ai-form";
 import { BusinessForm } from "./business-form";
 import { CurrencyForm } from "./currency-form";
 
@@ -20,11 +21,12 @@ import { CurrencyForm } from "./currency-form";
  * in a store: `/settings?tab=currency` is a shareable answer to "where do I
  * change the rate", and the back button leaves the tab strip.
  */
-const SETTINGS_TABS = ["business", "currency"] as const;
+const SETTINGS_TABS = ["business", "currency", "ai"] as const;
 
 const TAB_LABELS: Record<(typeof SETTINGS_TABS)[number], string> = {
   business: "Business",
   currency: "Currency",
+  ai: "AI insights",
 };
 
 const tabParser = parseAsStringLiteral(SETTINGS_TABS).withDefault("business");
@@ -78,7 +80,13 @@ export function SettingsPage() {
         id={`settings-panel-${tab}`}
         aria-labelledby={`settings-tab-${tab}`}
       >
-        {tab === "business" ? <BusinessForm /> : <CurrencyForm />}
+        {tab === "business" ? (
+          <BusinessForm />
+        ) : tab === "currency" ? (
+          <CurrencyForm />
+        ) : (
+          <AiForm />
+        )}
       </div>
     </div>
   );
