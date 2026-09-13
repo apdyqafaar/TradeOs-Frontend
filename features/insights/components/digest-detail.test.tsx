@@ -88,3 +88,71 @@ describe("DigestDetail", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("DigestDetail — the analysts' trace", () => {
+  it("renders the same audit block `/insights` does, from the one component", () => {
+    // This block was duplicated verbatim between `insights-screen.tsx` and
+    // this file: same section, same heading, same three-number sentence, same
+    // TraceView. Extracted to `<TraceSection>` before the two copies could
+    // drift — the shape the bare-date bug had before `formatLocalDate` was
+    // pulled out. Both screens are asserted, one here and one in
+    // `insights-screen.test.tsx`, so a caller quietly dropping it is caught.
+    query = {
+      data: {
+        id: "d1",
+        localDate: "2026-09-12",
+        timezone: "Africa/Addis_Ababa",
+        language: "en",
+        model: "m",
+        trigger: "cron",
+        status: "complete",
+        stoppedBy: "complete",
+        sections: {
+          sales: {
+            headline: "A steady Saturday",
+            points: [],
+            comparison: { vsLastWeek: "flat", monthToDate: "flat" },
+            anomalies: [],
+          },
+          debts: null,
+          stock: null,
+          team: null,
+          recommendations: null,
+        },
+        errors: [],
+        trace: [
+          {
+            seq: 1,
+            agent: "Sales analyst",
+            tool: "getDailySales",
+            input: {},
+            summary: "Read yesterday's sales",
+            output: {},
+            ms: 12,
+          },
+        ],
+        usage: {
+          inputTokens: 1,
+          outputTokens: 1,
+          calls: 9,
+          routerCalls: 4,
+          costUsd: 0.08,
+        },
+        generatedAt: "2026-09-12T18:06:00.000Z",
+        createdAt: "2026-09-12T18:06:00.000Z",
+      },
+      error: null,
+      isPending: false,
+    };
+
+    render(<DigestDetail id="d1" />);
+
+    expect(
+      screen.getByText(/what the analysts looked at/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/9 analyst turns · 4 routing decisions · 1 tool calls/),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Sales analyst")).toBeInTheDocument();
+  });
+});

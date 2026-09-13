@@ -7,7 +7,7 @@ import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ROUTES } from "@/config/routes";
 import { DigestView } from "@/features/insights/components/digest-view";
-import { TraceView } from "@/features/insights/components/trace-view";
+import { TraceSection } from "@/features/insights/components/trace-section";
 import { useDigest } from "@/features/insights/hooks/use-digests";
 
 /**
@@ -82,17 +82,7 @@ export function DigestDetail({ id }: { id: string }) {
     <div className="flex flex-col gap-6">
       {back}
       <DigestView digest={digest.data} />
-      <section className="flex flex-col gap-3">
-        <h2 className="font-mono text-[10px] text-muted-foreground uppercase tracking-[0.08em]">
-          What the analysts looked at
-        </h2>
-        <p className="font-mono text-[11px] text-muted-2">
-          {digest.data.usage.calls} analyst turns ·{" "}
-          {digest.data.usage.routerCalls} routing decisions ·{" "}
-          {digest.data.trace.length} tool calls
-        </p>
-        <TraceView trace={digest.data.trace} />
-      </section>
+      <TraceSection digest={digest.data} />
     </div>
   );
 }

@@ -285,8 +285,26 @@ describe("cameraSupport", () => {
   });
 });
 
+/**
+ * Headroom for the only tests in the suite that dynamically import ZXing and
+ * run a real decode over a rendered frame.
+ *
+ * The work is genuine — this file passes in about 1.5 s on its own — but under
+ * full-suite load on a busy machine the EAN-13 case has been measured at
+ * 9167 ms and timed out at the 5000 ms default, giving a red run that a rerun
+ * turns green. A flake in the gate everyone trusts is worse than a red test,
+ * so the deadline stops depending on how many other workers happen to be
+ * running. Nothing here is expected to be slow; this is headroom, not a target.
+ *
+ * Declared per test, NOT as `describe("…", { testTimeout }, fn)`: that
+ * three-argument form is accepted without complaint by this Vitest and has no
+ * effect whatsoever — checked with a deliberately slow probe, which still died
+ * at 5000 ms.
+ */
+const ZXING = { timeout: 30_000 };
+
 describe("loadZxingDetector", () => {
-  it("decodes an EAN-13 off a camera frame", async () => {
+  it("decodes an EAN-13 off a camera frame", ZXING, async () => {
     framePixels = renderFrame(encodeEan13(EAN_13));
 
     const detector = await loadZxingDetector();
@@ -295,7 +313,7 @@ describe("loadZxingDetector", () => {
     expect(found?.[0]?.rawValue).toBe(EAN_13);
   });
 
-  it("decodes a Code 39 label a shop printed itself", async () => {
+  it("decodes a Code 39 label a shop printed itself", ZXING, async () => {
     // The other half of `BARCODE_FORMATS` that matters: loose grain and
     // re-packed cartons get a label from the shop's own printer, and a shop
     // cannot generate an EAN without buying a GS1 prefix. A build that only
@@ -309,7 +327,7 @@ describe("loadZxingDetector", () => {
     expect(found?.[0]?.rawValue).toBe("TRADEOS42");
   });
 
-  it("returns nothing for a frame with no barcode in it", async () => {
+  it("returns nothing for a frame with no barcode in it", ZXING, async () => {
     // Most frames. This must be an empty array and not a throw, or the frame
     // loop stops scanning the moment the lens points at the counter.
     framePixels = blankFrame();
@@ -319,7 +337,7 @@ describe("loadZxingDetector", () => {
     await expect(detector?.detect(fakeVideo())).resolves.toEqual([]);
   });
 
-  it("does not read a frame that has no dimensions yet", async () => {
+  it("does not read a frame that has no dimensions yet", ZXING, async () => {
     // The first frames of every stream. `getImageData` on a 0×0 canvas throws
     // in a real browser, and the loop would swallow it as "no barcode" for
     // ever if the size never arrived.
@@ -332,15 +350,19 @@ describe("loadZxingDetector", () => {
     expect(drawImage).not.toHaveBeenCalled();
   });
 
-  it("gives up rather than throwing when there is no 2D context", async () => {
-    Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
-      configurable: true,
-      writable: true,
-      value: () => null,
-    });
+  it(
+    "gives up rather than throwing when there is no 2D context",
+    ZXING,
+    async () => {
+      Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
+        configurable: true,
+        writable: true,
+        value: () => null,
+      });
 
-    await expect(loadZxingDetector()).resolves.toBeNull();
-  });
+      await expect(loadZxingDetector()).resolves.toBeNull();
+    },
+  );
 
   it("pins itself to the same formats as the native detector", () => {
     // Both decoders answer the same six, so a scan cannot succeed on one
@@ -374,7 +396,7 @@ describe("loadDetector", () => {
     expect(detect).toHaveBeenCalled();
   });
 
-  it("falls back to ZXing when the browser has none", async () => {
+  it("falls back to ZXing when the browser has none", ZXING, async () => {
     framePixels = renderFrame(encodeEan13(EAN_13));
 
     const detector = await loadDetector();

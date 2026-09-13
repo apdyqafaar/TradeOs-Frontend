@@ -192,3 +192,24 @@ describe("InsightsScreen — the paused state", () => {
     expect(document.querySelector('[data-slot="skeleton"]')).not.toBeNull();
   });
 });
+
+describe("InsightsScreen — the analysts' trace", () => {
+  it("renders the shared audit block under the digest", () => {
+    // The other half of the `<TraceSection>` extraction; `digest-detail.test.tsx`
+    // asserts it on `/insights/:id`.
+    profile = {
+      isLoading: false,
+      data: { ai: { enabled: true, language: "en", hourLocal: 21 } },
+    };
+    latest = { data: digest(), isPending: false, error: null };
+
+    render(<InsightsScreen />);
+
+    expect(
+      screen.getByText(/what the analysts looked at/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/9 analyst turns · 4 routing decisions · 0 tool calls/),
+    ).toBeInTheDocument();
+  });
+});

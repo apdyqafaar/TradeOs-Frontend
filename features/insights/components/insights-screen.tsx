@@ -10,7 +10,7 @@ import { useCan } from "@/features/auth/hooks/use-permission";
 import { DigestHistory } from "@/features/insights/components/digest-history";
 import { DigestView } from "@/features/insights/components/digest-view";
 import { RunDigestButton } from "@/features/insights/components/run-digest-button";
-import { TraceView } from "@/features/insights/components/trace-view";
+import { TraceSection } from "@/features/insights/components/trace-section";
 import { useLatestDigest } from "@/features/insights/hooks/use-digests";
 import { useOrganizationProfile } from "@/features/organization/hooks/use-organization-profile";
 import { PERMISSIONS } from "@/lib/auth/permissions";
@@ -117,17 +117,7 @@ export function InsightsScreen() {
       {latest.data ? (
         <>
           <DigestView digest={latest.data} />
-          <section className="flex flex-col gap-3">
-            <h2 className="font-mono text-[10px] text-muted-foreground uppercase tracking-[0.08em]">
-              What the analysts looked at
-            </h2>
-            <p className="font-mono text-[11px] text-muted-2">
-              {latest.data.usage.calls} analyst turns ·{" "}
-              {latest.data.usage.routerCalls} routing decisions ·{" "}
-              {latest.data.trace.length} tool calls
-            </p>
-            <TraceView trace={latest.data.trace} />
-          </section>
+          <TraceSection digest={latest.data} />
         </>
       ) : (
         <NoDigestYet ai={ai} canConfigure={canRun} />
