@@ -3,6 +3,7 @@
 import { ButtonLink } from "@/components/shared/button-link";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorCard } from "@/components/shared/error-card";
+import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ROUTES } from "@/config/routes";
 import { DigestView } from "@/features/insights/components/digest-view";
@@ -37,6 +38,10 @@ export function DigestDetail({ id }: { id: string }) {
   }
 
   if (digest.error) {
+    // Nothing broke — the caller simply may not read this any more. A
+    // generic `<ErrorCard retry>` would offer a "Try again" that fails
+    // identically forever. Compare `reports-hub.tsx`.
+    if (digest.error.status === 403) return <ForbiddenScreen />;
     if (digest.error.status === 404) {
       return (
         <div className="flex flex-col gap-6">

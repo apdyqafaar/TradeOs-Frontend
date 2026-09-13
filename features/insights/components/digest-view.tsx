@@ -45,12 +45,20 @@ function Missing({ what }: { what: SectionKey }) {
   );
 }
 
-/** A plain bullet list. Every item is model-written text, rendered as a text node. */
+/**
+ * A plain bullet list. Every item is model-written text, rendered as a text
+ * node.
+ *
+ * Keyed by index, not by the line itself: this text is written by a language
+ * model, and a repeated line is not hypothetical (a "batteries running low"
+ * warning could easily be said twice). Keying by content would collide.
+ */
 function Lines({ items }: { items: string[] }) {
   return (
     <ul className="flex flex-col gap-1.5 text-[13px] text-foreground">
-      {items.map((line) => (
-        <li key={line} className="leading-relaxed">
+      {items.map((line, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: model-written lines carry no id and this list is never reordered independently of the digest it belongs to; a repeated line must not collide.
+        <li key={index} className="leading-relaxed">
           {line}
         </li>
       ))}
@@ -58,13 +66,20 @@ function Lines({ items }: { items: string[] }) {
   );
 }
 
-/** An "**name** — why" row: `accountsToChase` and `reorder` share this shape. */
+/**
+ * An "**name** — why" row: `accountsToChase` and `reorder` share this shape.
+ *
+ * Keyed by index, not by `row.name`: two `accountsToChase` rows can legitimately
+ * name the same customer for two different reasons, and the wire carries no
+ * id for either row beyond the name.
+ */
 function WhyList({ rows }: { rows: { name: string; why: string }[] }) {
   return (
     <ul className="flex flex-col gap-1.5">
-      {rows.map((row) => (
+      {rows.map((row, index) => (
         <li
-          key={row.name}
+          // biome-ignore lint/suspicious/noArrayIndexKey: rows carry no id beyond the customer/product name, which the model can legitimately repeat; this list is never reordered independently of the digest it belongs to.
+          key={index}
           className="flex flex-wrap items-baseline gap-x-1.5 text-[13px] leading-relaxed"
         >
           <span className="font-medium text-foreground">{row.name}</span>

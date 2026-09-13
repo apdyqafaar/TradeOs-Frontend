@@ -60,19 +60,21 @@ const digest = (overrides: Partial<Digest> = {}): Digest => ({
 describe("DigestView", () => {
   it("renders five cards from the sections", () => {
     render(<DigestView digest={digest()} timezone="Africa/Addis_Ababa" />);
-    // `getAllByText`, not `getByText`: "Hodan Traders" is named twice by
-    // design — once as the debts card's overdue account, once again inside
-    // the recommendation that says to call them — so a substring match on
-    // "Hodan Traders" legitimately finds two elements.
     for (const text of [
       "A steady Saturday",
-      "Hodan Traders",
       "AA batteries 4pk",
       "Amina: 38 sales",
       "Call Hodan Traders",
     ]) {
-      expect(screen.getAllByText(new RegExp(text)).length).toBeGreaterThan(0);
+      expect(screen.getByText(new RegExp(text))).toBeInTheDocument();
     }
+    // `getAllByText`, not `getByText`, for this one pair: "Hodan Traders" is
+    // named twice by design — once as the debts card's overdue account, once
+    // again inside the recommendation that says to call them — so a
+    // substring match on "Hodan Traders" legitimately finds two elements.
+    // The other four strings above only ever match one element, so they keep
+    // `getByText` and would still catch an accidental duplicate render.
+    expect(screen.getAllByText(/Hodan Traders/).length).toBeGreaterThan(0);
   });
 
   it("a partial digest names the missing section and why the run stopped", () => {

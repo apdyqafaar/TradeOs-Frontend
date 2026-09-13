@@ -2,6 +2,7 @@
 
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorCard } from "@/components/shared/error-card";
+import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCan } from "@/features/auth/hooks/use-permission";
 import { DigestHistory } from "@/features/insights/components/digest-history";
@@ -35,6 +36,14 @@ export function InsightsScreen() {
   const profile = useOrganizationProfile();
   const canRun = useCan(PERMISSIONS.ORGANIZATION_UPDATE);
   const hour = profile.data?.ai.hourLocal ?? DEFAULT_HOUR;
+
+  // Nothing broke — the caller simply may not read this any more.
+  // `requirePageAccess` already gated the route server-side, but that only
+  // runs on a full load or a fresh server request; a permission revoked
+  // mid-session surfaces here instead, on the next background refetch. A
+  // generic `<ErrorCard retry>` would offer a "Try again" that fails
+  // identically forever. Compare `reports-hub.tsx`.
+  if (latest.error?.status === 403) return <ForbiddenScreen />;
 
   const header = (
     <div className="flex items-start justify-between gap-4">

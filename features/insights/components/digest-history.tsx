@@ -90,7 +90,17 @@ export function DigestHistory({ timezone }: DigestHistoryProps) {
             }}
           />
         </div>
-      ) : isPending ? (
+      ) : null}
+
+      {/*
+        A failure with nothing cached renders the card and nothing else: an
+        empty list under it would read as "no earlier digests" rather than
+        "we could not ask". A failure *over* existing rows keeps them — a
+        background refetch that 500s should not blank a list the reader was
+        already looking at (same convention as `customers-page.tsx` /
+        `products-page.tsx`).
+      */}
+      {error && !data ? null : isPending ? (
         <div className="flex flex-col gap-2 p-[18px]">
           {Array.from({ length: SKELETON_ROWS }, (_, index) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length placeholder rows with no identity of their own, never reordered
