@@ -95,18 +95,19 @@ export function AiForm() {
       description="Every evening, four analysts read the day's figures and write you a short digest: sales, debts, stock, the team, and what to do tomorrow."
     >
       <form onSubmit={submit} className="flex flex-col gap-5" noValidate>
-        <Field id={enabledId} label="Daily digest">
+        <Field
+          id={enabledId}
+          label="Daily digest"
+          hint="Generate a digest every evening"
+        >
           {(props) => (
-            <label className="flex items-center gap-3 text-[13px] text-foreground">
-              <input
-                {...props}
-                type="checkbox"
-                checked={value.enabled}
-                onChange={(event) => set("enabled", event.target.checked)}
-                className="size-4 accent-primary"
-              />
-              Generate a digest every evening
-            </label>
+            <input
+              {...props}
+              type="checkbox"
+              checked={value.enabled}
+              onChange={(event) => set("enabled", event.target.checked)}
+              className="size-4 accent-primary"
+            />
           )}
         </Field>
 
@@ -161,7 +162,7 @@ export function AiForm() {
         {update.error && !hasFieldErrors ? (
           <ErrorCard error={update.error} />
         ) : null}
-        {update.isSuccess && Object.keys(draft).length === 0 ? (
+        {!issue && update.isSuccess && Object.keys(draft).length === 0 ? (
           <SuccessNote>Saved.</SuccessNote>
         ) : null}
 
