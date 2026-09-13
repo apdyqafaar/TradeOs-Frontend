@@ -180,3 +180,23 @@ describe("InsightsScreen — off, on-but-waiting, and present", () => {
     expect(screen.queryByText(/daily digest is off/i)).not.toBeInTheDocument();
   });
 });
+
+describe("InsightsScreen — the paused state", () => {
+  it("waits rather than announcing 'no digest yet' to a shop that has one", () => {
+    // React Query's default `networkMode: "online"` with the browser offline:
+    // `isPending: true, isFetching: false, data: undefined, error: null`.
+    // `isLoading` is FALSE there, which is why this screen used to fall
+    // straight through to the empty state. `DigestHistory` already used
+    // `isPending`; all three components on this feature now agree.
+    latest = { data: undefined, isPending: true, error: null };
+    profile = {
+      isLoading: false,
+      data: { ai: { enabled: true, language: "en", hourLocal: 21 } },
+    };
+
+    render(<InsightsScreen />);
+
+    expect(screen.queryByText(/no digest yet/i)).not.toBeInTheDocument();
+    expect(document.querySelector('[data-slot="skeleton"]')).not.toBeNull();
+  });
+});

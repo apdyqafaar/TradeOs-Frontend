@@ -28,21 +28,20 @@ export function DigestDetail({ id }: { id: string }) {
     </ButtonLink>
   );
 
-  if (digest.isLoading || organizationLoading) {
-    return (
-      <div className="flex flex-col gap-6">
-        {back}
-        <Skeleton className="h-[420px] rounded-[12px]" />
-      </div>
-    );
-  }
-
   if (digest.error) {
     // Nothing broke — the caller simply may not read this any more. A
     // generic `<ErrorCard retry>` would offer a "Try again" that fails
     // identically forever. Compare `reports-hub.tsx`.
     if (digest.error.status === 403) return <ForbiddenScreen />;
-    if (digest.error.status === 404) {
+    // 422 as well as 404, because a malformed id never reaches the handler:
+    // `GET /digests/:id` runs `validate({ params: idParamSchema })` first
+    // (`Backend/src/routes/v1/digest.route.ts:48`), and a non-ObjectId is a
+    // `ValidationError` — 422 (`Backend/src/util/errors.ts:116`). A shared or
+    // truncated link (`/insights/abc`) is the likeliest way to arrive at a
+    // wrong id, and it used to land on a destructive card offering "Try
+    // again" on a refusal that will never change its mind. Both mean the same
+    // thing to the reader: the digest this link points at is not there.
+    if (digest.error.status === 404 || digest.error.status === 422) {
       return (
         <div className="flex flex-col gap-6">
           {back}
@@ -66,7 +65,20 @@ export function DigestDetail({ id }: { id: string }) {
     );
   }
 
-  if (!digest.data) return null;
+  // Pending, or the paused state React Query's default `networkMode: "online"`
+  // produces when the browser reports offline (`isPending: true, data:
+  // undefined, error: null`). `isPending` rather than `isLoading` so the three
+  // components on this feature agree on one predicate — and a skeleton rather
+  // than the `return null` that used to sit here, which rendered a completely
+  // blank content area with not even the way back on it.
+  if (digest.isPending || organizationLoading || !digest.data) {
+    return (
+      <div className="flex flex-col gap-6">
+        {back}
+        <Skeleton className="h-[420px] rounded-[12px]" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">

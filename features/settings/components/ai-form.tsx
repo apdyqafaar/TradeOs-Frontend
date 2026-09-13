@@ -55,6 +55,28 @@ export function AiForm() {
   const [draft, setDraft] = useState<UpdateAiSettingsInput>({});
   const [issue, setIssue] = useState<string | null>(null);
 
+  // Same shape as `business-form.tsx` and `currency-form.tsx`, which read the
+  // same query on the same tab strip. Without this branch a 500 — or an
+  // unreachable API, which the client normalises to status 0 and the retry
+  // policy treats as final, so it is never asked again — left this tab a grey
+  // rectangle for ever: no message, no request id, nothing for support to work
+  // from, while the tab next to it showed a proper card for the same failure.
+  if (profile.error) {
+    return (
+      <ErrorCard
+        error={profile.error}
+        title="Couldn't load your AI settings"
+        // A 403 answers the same way however many times it is asked, so
+        // offering "Try again" would only repeat it.
+        retry={
+          profile.error.status === 403
+            ? undefined
+            : () => void profile.refetch()
+        }
+      />
+    );
+  }
+
   if (profile.isLoading || !profile.data) {
     return <Skeleton className="h-[280px] rounded-[10px]" />;
   }

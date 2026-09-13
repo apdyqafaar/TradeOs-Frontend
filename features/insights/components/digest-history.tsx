@@ -65,9 +65,20 @@ export function DigestHistory({ timezone }: DigestHistoryProps) {
           <ErrorCard
             error={error}
             title="Couldn't load earlier digests"
-            retry={() => {
-              void refetch();
-            }}
+            // A 403 is not a failure to retry — nothing broke, this member
+            // simply may not read these any more — so no button that would
+            // ask again and be refused identically every time. The reachable
+            // path is an Owner removing `reports:view` mid-session: the
+            // cached `latest` above stays on screen, and pressing **Older**
+            // is a new query key and the first thing to be refused. Same
+            // rule as `previous-jobs.tsx` and `ErrorCard`'s own docblock.
+            retry={
+              error.status === 403
+                ? undefined
+                : () => {
+                    void refetch();
+                  }
+            }
           />
         </div>
       ) : null}

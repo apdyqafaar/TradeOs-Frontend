@@ -78,7 +78,19 @@ export function InsightsScreen() {
     </div>
   );
 
-  if (latest.isLoading || organizationLoading || profile.isLoading) {
+  // `isPending`, matching `DigestHistory` and `DigestDetail`: the three
+  // components on this feature used two predicates between them, and they
+  // differ exactly in the paused state React Query's default
+  // `networkMode: "online"` produces when the browser reports offline
+  // (`isPending: true, isFetching: false, data: undefined, error: null`).
+  // `isLoading` there is false, so this screen used to announce "no digest
+  // yet" to a shop that has one.
+  //
+  // `profile` keeps `isLoading` deliberately: `useOrganizationProfile` is
+  // disabled until the session reports an organization, and a disabled query
+  // reports `isPending: true` for ever — that one would be a skeleton with no
+  // end rather than a skeleton with a wrong caption.
+  if (latest.isPending || organizationLoading || profile.isLoading) {
     return (
       <div className="flex flex-col gap-6">
         {header}
