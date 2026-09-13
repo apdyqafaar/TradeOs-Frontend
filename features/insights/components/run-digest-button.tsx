@@ -12,10 +12,37 @@ const POLL_MS = 5_000;
 const GIVE_UP_MS = 120_000;
 
 /**
+ * A run in flight, and the digest that was on screen when it was asked for.
+ *
+ * Both identity fields are server-issued strings compared for inequality, not
+ * ordered or parsed — this is deliberately not a timestamp comparison. A
+ * manual run upserts the row for the same `localDate` (spec §5), so `id` can
+ * legitimately stay the same across a successful run and only `generatedAt`
+ * moves; either changing means the server has written something new.
+ */
+interface PendingRun {
+  localDate: string;
+  /** `null` when the shop had no digest at all when the run was asked for. */
+  previousId: string | null;
+  previousGeneratedAt: string | null;
+}
+
+/**
  * Posts `/digests/run`, then polls `latest` every 5s for up to two minutes —
  * the run itself takes about a minute (Backend spec §11). The three-a-day
  * limit is the server's; a 429 is shown where the click happened, never
  * swallowed into a toast.
+ *
+ * **Success is never decided against the browser's clock.** It used to be:
+ * `latest.data.generatedAt > new Date(startedAt).toISOString()` where
+ * `startedAt = Date.now()` on the client. No NTP is the norm on a shop counter
+ * PC in this market, and both directions of skew broke it — a clock ten
+ * minutes fast never recognised success (the new digest already rendered above
+ * while this button still said "Generating…", then "taking longer than
+ * expected"), and a slow one reported success on the first poll against a
+ * pre-existing row for the same day. Comparing the digest now on screen to the
+ * one that was on screen at click time is two server values and no local
+ * clock.
  */
 export function RunDigestButton({
   sinceLocalDate,
@@ -23,23 +50,22 @@ export function RunDigestButton({
   sinceLocalDate: string | null;
 }) {
   const run = useRunDigest();
-  const [waitingFor, setWaitingFor] = useState<string | null>(null);
-  const [startedAt, setStartedAt] = useState(0);
+  const [pending, setPending] = useState<PendingRun | null>(null);
   const [timedOut, setTimedOut] = useState(false);
-  const latest = useLatestDigest({ pollMs: waitingFor ? POLL_MS : undefined });
+  const latest = useLatestDigest({ pollMs: pending ? POLL_MS : undefined });
 
   // Success only: this genuinely is caused by new data arriving, so a
   // dependency-driven effect is the right tool for it.
   useEffect(() => {
-    if (!waitingFor) return;
-    if (
-      latest.data &&
-      latest.data.localDate === waitingFor &&
-      latest.data.generatedAt > new Date(startedAt).toISOString()
-    ) {
-      setWaitingFor(null);
-    }
-  }, [waitingFor, latest.data, startedAt]);
+    if (!pending) return;
+    const current = latest.data;
+    if (!current || current.localDate !== pending.localDate) return;
+    const unchanged =
+      current.id === pending.previousId &&
+      current.generatedAt === pending.previousGeneratedAt;
+    if (unchanged) return;
+    setPending(null);
+  }, [pending, latest.data]);
 
   // The give-up deadline, on the other hand, is NOT caused by anything
   // changing — its whole job is to fire when nothing has. A run that never
@@ -49,15 +75,15 @@ export function RunDigestButton({
   // the (near-zero-elapsed) run right after the click. A real timer fires on
   // its own clock regardless of whether anything else re-renders, and the
   // cleanup guarantees it cannot fire after success already cleared
-  // `waitingFor`, or after the component unmounts.
+  // `pending`, or after the component unmounts.
   useEffect(() => {
-    if (!waitingFor) return;
+    if (!pending) return;
     const timer = setTimeout(() => {
-      setWaitingFor(null);
+      setPending(null);
       setTimedOut(true);
     }, GIVE_UP_MS);
     return () => clearTimeout(timer);
-  }, [waitingFor]);
+  }, [pending]);
 
   const message = run.error
     ? run.error.code === API_ERROR_CODE.TOO_MANY_REQUESTS
@@ -67,7 +93,7 @@ export function RunDigestButton({
         : run.error.code === API_ERROR_CODE.AI_NOT_CONFIGURED
           ? "AI insights are not set up on this server yet."
           : run.error.message
-    : waitingFor
+    : pending
       ? "Generating… this takes about a minute."
       : timedOut
         ? // Not worded as a failure — the POST succeeded and the run may
@@ -79,18 +105,25 @@ export function RunDigestButton({
     <div className="flex flex-col items-end gap-2">
       <Button
         type="button"
-        disabled={run.isPending || Boolean(waitingFor)}
+        disabled={run.isPending || Boolean(pending)}
         onClick={() => {
           setTimedOut(false);
+          // Captured here, before the mutation's own `onSuccess` invalidates
+          // `digestKeys.all` and a refetch can land: this is the digest the
+          // reader was looking at when they asked for a new one.
+          const before = latest.data ?? null;
           run.mutate(undefined, {
             onSuccess: ({ localDate }) => {
-              setStartedAt(Date.now());
-              setWaitingFor(localDate);
+              setPending({
+                localDate,
+                previousId: before?.id ?? null,
+                previousGeneratedAt: before?.generatedAt ?? null,
+              });
             },
           });
         }}
       >
-        {waitingFor
+        {pending
           ? "Generating…"
           : sinceLocalDate
             ? "Generate again"
