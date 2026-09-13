@@ -30,6 +30,7 @@ import { StockSection } from "@/features/dashboard/components/stock-section";
 import { TeamSection } from "@/features/dashboard/components/team-section";
 import { useDashboard } from "@/features/dashboard/hooks/use-dashboard";
 import { useOrganization } from "@/features/organization/hooks/use-organization";
+import { useOrganizationProfile } from "@/features/organization/hooks/use-organization-profile";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 import { formatDate } from "@/lib/format/date";
 import { formatMoney } from "@/lib/format/money";
@@ -67,6 +68,21 @@ export function Overview({ name }: { name: string }) {
     isLoading: organizationLoading,
   } = useOrganization();
   const canRecordSale = useCan(PERMISSIONS.SALES_CREATE);
+  const canConfigureAi = useCan(PERMISSIONS.ORGANIZATION_UPDATE);
+
+  /**
+   * `ai.enabled` for the Insights strip, and nothing else on this page.
+   *
+   * `GET /dashboard` does not carry it: `organization.section.ts` returns
+   * `{ id, name, logo, timezone, currency }` and no `ai` block, checked
+   * against the backend source rather than assumed. So the one place that
+   * needs it asks `GET /organizations/current` — the same query the Settings
+   * AI tab already uses, deduplicated under `organizationKeys.current()`.
+   * `data` stays `undefined` while it loads and if it 403s (the route is
+   * gated `organization:view`), and the strip renders that as "not known"
+   * rather than as "off".
+   */
+  const profile = useOrganizationProfile();
 
   const now = new Date();
 
@@ -229,7 +245,13 @@ export function Overview({ name }: { name: string }) {
 
           {/* `undefined` = the API withheld the section (no `reports:view`). `null` =
               it was sent and there is no digest yet. Only the first means render nothing. */}
-          {digest !== undefined ? <InsightsSection section={digest} /> : null}
+          {digest !== undefined ? (
+            <InsightsSection
+              section={digest}
+              ai={profile.data?.ai ?? null}
+              canConfigureAi={canConfigureAi}
+            />
+          ) : null}
 
           {announcements !== undefined || team !== undefined ? (
             <Band

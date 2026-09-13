@@ -220,9 +220,14 @@ describe("InsightsSection", () => {
       />,
     );
     expect(screen.getByText(/could not be written/i)).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: /generate one now/i }),
-    ).toHaveAttribute("href", "/insights");
+    // The link was called "Generate one now" until 2026-09-13: it promised an
+    // action it does not perform and named no destination, and it sent a
+    // `reports:view`-only role to a page with no Generate control on it. The
+    // way in is still here; it is now named after where it goes.
+    expect(screen.getByRole("link", { name: "Open Insights" })).toHaveAttribute(
+      "href",
+      "/insights",
+    );
   });
 
   it("treats a failed run as failed even when a stray headline slipped through — status decides, not headline", () => {
@@ -247,9 +252,18 @@ describe("InsightsSection", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("points a shop with no digest yet at the setting that turns it on", () => {
-    render(<InsightsSection section={null} />);
-    expect(screen.getByText(/no digest yet/i)).toBeInTheDocument();
+  it("points a shop with the digest switched off at the setting that turns it on", () => {
+    // `section === null` alone used to produce this copy, which told a shop
+    // that had already enabled the digest to go and enable it. `ai.enabled` is
+    // what decides it now; the link still goes to the same place.
+    render(
+      <InsightsSection
+        section={null}
+        ai={{ enabled: false, hourLocal: 21 }}
+        canConfigureAi
+      />,
+    );
+    expect(screen.getByText(/daily digest is off/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /ai insights/i })).toHaveAttribute(
       "href",
       "/settings?tab=ai",
@@ -303,5 +317,97 @@ describe("InsightsSection", () => {
       "href",
       "/insights",
     );
+  });
+});
+
+/**
+ * `section === null` means "no digest row exists", never "the feature is off".
+ *
+ * `Backend/src/services/dashboard/digest.section.ts:14` returns `null` the
+ * moment there is no digest, regardless of `ai.enabled`, and `ai.enabled`
+ * defaults to `false` for every organization
+ * (`Backend/src/db/models/organization.model.ts:38`). Read together those two
+ * facts are the whole bug: a shop that enabled the digest at 14:00 was told to
+ * enable it until the 21:05 cron landed, while `/insights` told the shops that
+ * had NOT enabled it that a digest was arriving tonight. One state, two
+ * screens, two contradictory sentences, exactly one of them wrong at any
+ * moment.
+ *
+ * `features/insights/components/insights-screen.test.tsx` asserts the matching
+ * three states on the other screen.
+ */
+describe("InsightsSection — off, on-but-waiting, and not-known-yet", () => {
+  it("names the arrival hour, and never says to turn it on, once the digest IS enabled", () => {
+    render(
+      <InsightsSection
+        section={null}
+        ai={{ enabled: true, hourLocal: 20 }}
+        canConfigureAi
+      />,
+    );
+    expect(screen.getByText(/20:00 tonight/)).toBeInTheDocument();
+    expect(screen.queryByText(/turn it on/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /ai insights/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("never names an arrival time while the digest is off", () => {
+    render(
+      <InsightsSection
+        section={null}
+        ai={{ enabled: false, hourLocal: 21 }}
+        canConfigureAi
+      />,
+    );
+    expect(screen.queryByText(/21:00/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/tonight/i)).not.toBeInTheDocument();
+  });
+
+  it("gives a member who cannot open Settings the sentence without the dead link", () => {
+    // `/settings` is gated `organization:update` in `config/routes.ts` and
+    // enforced server-side by `requirePageAccess`, so this link would land a
+    // `reports:view`-only role on a full <ForbiddenScreen/>.
+    render(
+      <InsightsSection
+        section={null}
+        ai={{ enabled: false, hourLocal: 21 }}
+        canConfigureAi={false}
+      />,
+    );
+    expect(screen.getByText(/daily digest is off/i)).toBeInTheDocument();
+    expect(screen.getByText(/an owner can switch it on/i)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /ai insights/i })).toBeNull();
+  });
+
+  it("promises nothing at all while the AI settings are not known", () => {
+    // `GET /organizations/current` is gated `organization:view` and can 403
+    // for a custom role holding only `reports:view`. Neither "it is off" nor
+    // "it arrives at 21:00" is known to be true, so the strip says neither.
+    render(<InsightsSection section={null} />);
+    expect(screen.getByText(/no digest yet/i)).toBeInTheDocument();
+    expect(screen.queryByText(/tonight/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/is off/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /ai insights/i })).toBeNull();
+  });
+
+  it("still shows last night's headline when a digest exists, whatever ai.enabled says", () => {
+    // Switching the feature off does not make yesterday's digest untrue.
+    render(
+      <InsightsSection
+        section={{
+          id: "d7",
+          localDate: "2026-09-12",
+          status: "complete",
+          headline: "A steady Saturday",
+        }}
+        ai={{ enabled: false, hourLocal: 21 }}
+        canConfigureAi
+      />,
+    );
+    expect(
+      screen.getByRole("link", { name: "A steady Saturday" }),
+    ).toHaveAttribute("href", "/insights");
+    expect(screen.queryByText(/daily digest is off/i)).toBeNull();
   });
 });

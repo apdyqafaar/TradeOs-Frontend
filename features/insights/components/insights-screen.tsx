@@ -1,9 +1,11 @@
 "use client";
 
+import { ButtonLink } from "@/components/shared/button-link";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorCard } from "@/components/shared/error-card";
 import { ForbiddenScreen } from "@/components/shared/forbidden-screen";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ROUTES } from "@/config/routes";
 import { useCan } from "@/features/auth/hooks/use-permission";
 import { DigestHistory } from "@/features/insights/components/digest-history";
 import { DigestView } from "@/features/insights/components/digest-view";
@@ -14,9 +16,6 @@ import { useOrganization } from "@/features/organization/hooks/use-organization"
 import { useOrganizationProfile } from "@/features/organization/hooks/use-organization-profile";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 
-/** What time the digest arrives when no `ai` settings have loaded yet. */
-const DEFAULT_HOUR = 21;
-
 /**
  * `/insights` — the evening digest, written from the day's figures.
  *
@@ -24,18 +23,34 @@ const DEFAULT_HOUR = 21;
  * (`docs/API-ROUTES.md`, `POST /digests/run`), the same one that gates the
  * settings screen the digest is configured from — not a reports permission,
  * because generating one is a write on the organization's AI usage, not a
- * read of its reports.
+ * read of its reports. It is also the permission `/settings` itself is gated
+ * on, so the one flag decides both the button and the link below.
  *
  * A 404 on `latest` is "no digest yet", an answer rather than a failure
  * (`useLatestDigest`'s own `retry: false`), so it renders the empty state
  * rather than the error card.
+ *
+ * **"No digest yet" is two different states, and this screen used to conflate
+ * them.** `ai.enabled` defaults to `false`
+ * (`Backend/src/db/models/organization.model.ts:38`), so every tenant starts
+ * with the feature switched off — and this screen read `ai.hourLocal` without
+ * ever reading `ai.enabled`, telling those shops their first digest arrived at
+ * 21:00 tonight and offering a Generate button whose only possible answer was
+ * `409 AI_DISABLED_FOR_ORGANIZATION`. Three states now, and the Overview strip
+ * (`features/dashboard/components/insights-section.tsx`) renders the same
+ * three from the same `ai.enabled`, so the two screens cannot contradict each
+ * other.
  */
 export function InsightsScreen() {
   const latest = useLatestDigest();
   const { timezone, isLoading: organizationLoading } = useOrganization();
   const profile = useOrganizationProfile();
   const canRun = useCan(PERMISSIONS.ORGANIZATION_UPDATE);
-  const hour = profile.data?.ai.hourLocal ?? DEFAULT_HOUR;
+
+  // `null` — not `false` — when the profile could not be read: a role holding
+  // `reports:view` but not `organization:view` gets a 403 here, and "we do not
+  // know" must not be rendered as "it is off".
+  const ai = profile.data?.ai ?? null;
 
   // Nothing broke — the caller simply may not read this any more.
   // `requirePageAccess` already gated the route server-side, but that only
@@ -53,13 +68,17 @@ export function InsightsScreen() {
           Your evening digest, written from the day's figures.
         </p>
       </div>
-      {canRun ? (
+      {/* Not offered while the feature is known to be off: the POST can only
+          answer 409, and the message it would then print contradicts the rest
+          of this screen. Still offered when `ai` is `null`, because that is
+          "unknown", not "off". */}
+      {canRun && ai?.enabled !== false ? (
         <RunDigestButton sinceLocalDate={latest.data?.localDate ?? null} />
       ) : null}
     </div>
   );
 
-  if (latest.isLoading || organizationLoading) {
+  if (latest.isLoading || organizationLoading || profile.isLoading) {
     return (
       <div className="flex flex-col gap-6">
         {header}
@@ -101,14 +120,65 @@ export function InsightsScreen() {
           </section>
         </>
       ) : (
-        <EmptyState
-          title="No digest yet"
-          description={`Your first one arrives at ${String(hour).padStart(2, "0")}:00 tonight${
-            canRun ? ", or generate one now" : ""
-          }.`}
-        />
+        <NoDigestYet ai={ai} canConfigure={canRun} />
       )}
       <DigestHistory timezone={timezone} />
     </div>
+  );
+}
+
+/**
+ * The three things "there is no digest on this screen" can mean.
+ *
+ * Off, on-but-nothing-has-run-yet, and not-known-yet are genuinely different
+ * facts, and only one of them is an instruction to go and change a setting.
+ */
+function NoDigestYet({
+  ai,
+  canConfigure,
+}: {
+  ai: { enabled: boolean; hourLocal: number } | null;
+  canConfigure: boolean;
+}) {
+  if (ai === null) {
+    // Neither "it is off" nor "it arrives at 21:00" is known to be true.
+    return (
+      <EmptyState
+        title="No digest yet"
+        description="Digests that run overnight, and any you generate yourself, appear here."
+      />
+    );
+  }
+
+  if (!ai.enabled) {
+    return (
+      <EmptyState
+        title="The daily digest is off"
+        description={
+          canConfigure
+            ? "Nothing will arrive until it is switched on."
+            : "An owner can switch it on under Settings → AI insights."
+        }
+        // Omitted entirely for a member without `organization:update`:
+        // `/settings` is gated on that permission and enforced server-side
+        // (`config/routes.ts`), so the link would land on a ForbiddenScreen.
+        action={
+          canConfigure ? (
+            <ButtonLink href={`${ROUTES.settings}?tab=ai`}>
+              Settings → AI insights
+            </ButtonLink>
+          ) : null
+        }
+      />
+    );
+  }
+
+  return (
+    <EmptyState
+      title="No digest yet"
+      description={`Your first one arrives at ${String(ai.hourLocal).padStart(2, "0")}:00 tonight${
+        canConfigure ? ", or generate one now" : ""
+      }.`}
+    />
   );
 }
