@@ -1,6 +1,6 @@
 # API route map
 
-**All 112 endpoints, extracted from `../Backend/src/routes/v1/*.route.ts` on 2026-09-07 (plus `GET /uploads/:id`, added 2026-09-09, and the five AI digest endpoints below, added 2026-09-13) and
+**All 117 endpoints, extracted from `../Backend/src/routes/v1/*.route.ts` on 2026-09-07 (plus `GET /uploads/:id`, added 2026-09-09, and the five AI digest endpoints below, added 2026-09-13) and
 verified against the source, not from memory.** This is the contract the frontend codes against.
 
 ## Rules

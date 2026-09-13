@@ -62,9 +62,9 @@ async function loadService(reply: Reply = { status: 200, data: {} }) {
   return await import("./digest.service");
 }
 
-const envelope = (data: unknown, status = 200) => ({
+const envelope = (data: unknown, status = 200, meta?: unknown) => ({
   status,
-  data: { success: true, message: "ok", data },
+  data: { success: true, message: "ok", data, ...(meta ? { meta } : {}) },
 });
 
 beforeEach(() => {
@@ -82,6 +82,39 @@ describe("runDigest", () => {
     expect(seen[0]?.method).toBe("post");
     expect(seen[0]?.url).toBe("/digests/run");
     expect(result).toEqual({ localDate: "2026-09-13" });
+  });
+});
+
+describe("list", () => {
+  it("sends filters as query params, not as a config object", async () => {
+    // The trap: `apiGetList(BASE, params)` hands axios a config it does not
+    // recognise and sends no query string at all — a list stuck on page 1.
+    // This is the bug `listDigests` was written wrong with once already, and
+    // `{ page, limit }` is structurally assignable to `AxiosRequestConfig`
+    // through a typed variable, so `tsc` will NOT catch a regression back to
+    // it — only this assertion on the adapter's captured `params` will.
+    // Same shape as `features/projects/services/project.service.test.ts`'s
+    // "list" > "sends filters as query params, not as a config object".
+    const service = await loadService(
+      envelope([{ id: "d1" }], 200, {
+        page: 2,
+        limit: 20,
+        total: 21,
+        totalPages: 2,
+      }),
+    );
+
+    const page = await service.listDigests({ page: 2, limit: 20 });
+
+    expect(seen[0]?.url).toBe("/digests");
+    expect(seen[0]?.params).toEqual({ page: 2, limit: 20 });
+    expect(page.items).toEqual([{ id: "d1" }]);
+    expect(page.meta).toEqual({
+      page: 2,
+      limit: 20,
+      total: 21,
+      totalPages: 2,
+    });
   });
 });
 
