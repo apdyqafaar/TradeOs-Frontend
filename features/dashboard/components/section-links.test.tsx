@@ -195,7 +195,6 @@ describe("InsightsSection", () => {
   it("opens the Insights page from last night's headline", () => {
     render(
       <InsightsSection
-        timezone={TZ}
         section={{
           id: "d1",
           localDate: "2026-09-12",
@@ -212,7 +211,6 @@ describe("InsightsSection", () => {
   it("says so when last night's digest could not be written, and still offers a way in", () => {
     render(
       <InsightsSection
-        timezone={TZ}
         section={{
           id: "d2",
           localDate: "2026-09-12",
@@ -227,15 +225,40 @@ describe("InsightsSection", () => {
     ).toHaveAttribute("href", "/insights");
   });
 
+  it("treats a failed run as failed even when a stray headline slipped through — status decides, not headline", () => {
+    // Nothing yet enforces headline-null ⟺ status-failed: the digest
+    // orchestrator that assigns `status` is a later, separate task. The strip
+    // must not read a non-null headline as proof the run succeeded.
+    render(
+      <InsightsSection
+        section={{
+          id: "d5",
+          localDate: "2026-09-12",
+          status: "failed",
+          headline: "Half-written before the run failed",
+        }}
+      />,
+    );
+    expect(screen.getByText(/could not be written/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", {
+        name: "Half-written before the run failed",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
   it("points a shop with no digest yet at the setting that turns it on", () => {
-    render(<InsightsSection timezone={TZ} section={null} />);
+    render(<InsightsSection section={null} />);
     expect(screen.getByText(/no digest yet/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /ai insights/i })).toHaveAttribute(
+      "href",
+      "/settings?tab=ai",
+    );
   });
 
   it("marks a partial digest as partial rather than passing it off as complete", () => {
     render(
       <InsightsSection
-        timezone={TZ}
         section={{
           id: "d3",
           localDate: "2026-09-12",
@@ -245,5 +268,40 @@ describe("InsightsSection", () => {
       />,
     );
     expect(screen.getByText(/partial/i)).toBeInTheDocument();
+  });
+
+  it("renders last night's calendar day exactly as given, with no timezone shift", () => {
+    // `localDate` is already local. Routing it through `formatDate` with a
+    // timezone west of Greenwich used to print the day before — see
+    // `lib/format/date.test.ts`'s `formatLocalDate` cases for the direct
+    // comparison against that bug.
+    render(
+      <InsightsSection
+        section={{
+          id: "d6",
+          localDate: "2026-09-12",
+          status: "complete",
+          headline: "A steady Saturday",
+        }}
+      />,
+    );
+    expect(screen.getByText(/12 sep 2026/i)).toBeInTheDocument();
+  });
+
+  it("names its header link's destination instead of a bare verb", () => {
+    render(
+      <InsightsSection
+        section={{
+          id: "d1",
+          localDate: "2026-09-12",
+          status: "complete",
+          headline: "A steady Saturday",
+        }}
+      />,
+    );
+    expect(screen.getByRole("link", { name: "All insights" })).toHaveAttribute(
+      "href",
+      "/insights",
+    );
   });
 });

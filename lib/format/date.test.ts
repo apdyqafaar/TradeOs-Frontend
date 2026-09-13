@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatDate,
   formatDateTime,
+  formatLocalDate,
   formatRelative,
   formatTime,
 } from "@/lib/format/date";
@@ -32,6 +33,27 @@ describe("formatDate", () => {
 
   it("shows a placeholder rather than 'Invalid Date' in a cell", () => {
     expect(formatDate("not a date", NAIROBI)).toBe("—");
+  });
+});
+
+describe("formatLocalDate", () => {
+  it("prints the calendar date exactly as given", () => {
+    expect(formatLocalDate("2026-09-12")).toBe("12 Sep 2026");
+  });
+
+  it("shows a placeholder for a malformed value", () => {
+    expect(formatLocalDate("not-a-date")).toBe("—");
+  });
+
+  it("is unaffected by timezone, unlike formatDate on the same bare string — this is why it exists", () => {
+    // A bare `yyyy-MM-dd` (a digest's `localDate`, a trend bucket's `bucket`)
+    // has no time component. `formatDate` parses it as UTC midnight and
+    // re-renders that instant in the given zone, which prints the day before
+    // for any zone west of Greenwich. Verified here rather than assumed:
+    expect(formatDate("2026-09-12", NEW_YORK)).toBe("11 Sep 2026");
+    // `formatLocalDate` takes no timezone and performs no such conversion, so
+    // the same string always renders as the day it names.
+    expect(formatLocalDate("2026-09-12")).toBe("12 Sep 2026");
   });
 });
 

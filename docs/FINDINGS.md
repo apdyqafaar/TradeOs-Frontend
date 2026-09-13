@@ -376,6 +376,16 @@ link. Making either guest-only breaks a supported flow.
 
 ## 5. Deferred and worth doing
 
+- **`bucketLabel` (`features/reports/lib/format.ts`) predates `formatLocalDate` (`lib/format/date.ts`)
+  and duplicates its reasoning.** Both exist because a bare `yyyy-MM-dd` the server already resolved
+  in the business timezone must never be passed to `formatDate`, which would re-parse it as UTC
+  midnight and print the day before for a shop west of Greenwich — this mistake shipped three times
+  (`bucketLabel`, a first local copy in `features/insights/components/digest-history.tsx`, and again
+  in `features/dashboard/components/insights-section.tsx`) before the second and third were pointed
+  at the one shared helper, `formatLocalDate`. `bucketLabel` was left as its own local fix rather than
+  rewritten during that cleanup — it is correct today and rewriting working reports code was outside
+  that task's scope — but it is worth adopting `formatLocalDate` there too next time that file is
+  touched, so there is one canonical implementation instead of two that happen to agree.
 - **`useOrganization()` costs a request the dashboard has already answered.** `GET /dashboard`
   returns `organization.timezone` and `organization.currency`, so the Overview fetches the currency
   config a second time. Reading it from the dashboard payload on that page would remove a request.

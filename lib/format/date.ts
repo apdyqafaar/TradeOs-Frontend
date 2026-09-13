@@ -36,6 +36,33 @@ export function formatDate(value: DateInput, timeZone: string): string {
   return date ? format(date, "dd MMM yyyy", { in: tz(timeZone) }) : PLACEHOLDER;
 }
 
+/**
+ * `"12 Sep 2026"` — a **bare calendar date the server already resolved**, not
+ * an instant. Feed it a plain `yyyy-MM-dd` (a digest's `localDate`, a trend
+ * bucket's `bucket`) and it prints that day's number, month and year exactly
+ * as given. No timezone parameter, because there is nothing left to convert:
+ * the day was already picked in the business's own timezone server-side, and
+ * this only ever formats the three parts it was handed.
+ *
+ * **Do not reach for `formatDate` here instead — it looks equivalent and is
+ * not.** `formatDate` does `new Date(value)` on the string, which JS parses as
+ * UTC midnight, then re-renders that instant in a timezone. For any zone at or
+ * east of UTC the shift lands back on the same date and the bug is invisible;
+ * west of UTC it prints the day *before* the one the string names. This repo
+ * has now shipped that exact mistake three times: `bucketLabel` in
+ * `features/reports/lib/format.ts` (left as its own local fix — see
+ * `docs/FINDINGS.md` §5), a first copy inside
+ * `features/insights/components/digest-history.tsx`, and again in
+ * `features/dashboard/components/insights-section.tsx`. This function is the
+ * one place that mistake should still be possible to make, because the
+ * `timeZone` parameter that invites it does not exist here.
+ */
+export function formatLocalDate(value: string): string {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return PLACEHOLDER;
+  return format(new Date(year, month - 1, day), "dd MMM yyyy");
+}
+
 /** `"14:32"` — 24-hour, because receipts and shifts are read, not spoken. */
 export function formatTime(value: DateInput, timeZone: string): string {
   const date = toDate(value);

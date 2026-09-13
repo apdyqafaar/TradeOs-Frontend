@@ -89,3 +89,78 @@ describe("Overview", () => {
     expect(screen.getByText(/req_abc123/)).toBeInTheDocument();
   });
 });
+
+/**
+ * `sections.digest` is the one field on this page where `undefined` and
+ * `null` mean different, real things: the key is absent when the caller lacks
+ * `reports:view`, and `null` when the section exists but the shop has no
+ * digest yet. `Overview` reads it with `digest !== undefined`, and nothing
+ * above exercised that guard through a real `<Overview>` render — the
+ * `InsightsSection` tests in `section-links.test.tsx` render the component
+ * directly with an explicit `section` prop, so they cannot see whether
+ * `Overview`'s own read of `sections.digest` is wired correctly. A plausible
+ * simplification of that guard to `{digest && <InsightsSection .../>}` would
+ * compile, pass every other test in this file, and silently hide the "no
+ * digest yet" prompt from a real user — these three cases are what would
+ * actually catch it.
+ */
+describe("Overview — the Insights strip", () => {
+  const mySales = {
+    today: { count: 12, total: 4320 },
+    thisMonth: { count: 210, total: 88400 },
+    recent: [],
+  };
+
+  it("renders nothing when the API withholds the digest section (no reports:view)", () => {
+    dashboard.mockReturnValue({
+      isPending: false,
+      error: null,
+      data: {
+        available: ["organization", "me", "mySales"],
+        sections: { mySales },
+      },
+    });
+
+    render(wrap(<Overview name="Yusuf" />));
+    expect(screen.queryByText("Insights · last night")).not.toBeInTheDocument();
+  });
+
+  it("renders the strip and explains how to get a digest when the shop has none yet", () => {
+    dashboard.mockReturnValue({
+      isPending: false,
+      error: null,
+      data: {
+        available: ["organization", "me", "mySales", "digest"],
+        sections: { mySales, digest: null },
+      },
+    });
+
+    render(wrap(<Overview name="Yusuf" />));
+    expect(screen.getByText("Insights · last night")).toBeInTheDocument();
+    expect(screen.getByText(/no digest yet/i)).toBeInTheDocument();
+  });
+
+  it("renders last night's headline, linking into Insights, when a digest is present", () => {
+    dashboard.mockReturnValue({
+      isPending: false,
+      error: null,
+      data: {
+        available: ["organization", "me", "mySales", "digest"],
+        sections: {
+          mySales,
+          digest: {
+            id: "d1",
+            localDate: "2026-09-12",
+            status: "complete",
+            headline: "A steady Saturday",
+          },
+        },
+      },
+    });
+
+    render(wrap(<Overview name="Yusuf" />));
+    expect(
+      screen.getByRole("link", { name: "A steady Saturday" }),
+    ).toHaveAttribute("href", "/insights");
+  });
+});

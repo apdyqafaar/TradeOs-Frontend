@@ -1,7 +1,6 @@
 "use client";
 
 import { cn } from "cn";
-import { format } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -13,7 +12,7 @@ import { ROUTES } from "@/config/routes";
 import { SectionStrip } from "@/features/dashboard/components/section-strip";
 import { useDigests } from "@/features/insights/hooks/use-digests";
 import type { DigestStatus, DigestSummary } from "@/features/insights/types";
-import { formatDateTime } from "@/lib/format/date";
+import { formatDateTime, formatLocalDate } from "@/lib/format/date";
 
 const PAGE_SIZE = 10;
 const SKELETON_ROWS = 3;
@@ -28,25 +27,6 @@ const STATUS_LABELS: Record<DigestStatus, string> = {
   partial: "Partial",
   failed: "Failed",
 };
-
-/**
- * `localDate` is the calendar day the server already resolved in the business
- * timezone (`yyyy-MM-dd`), not an instant — the same shape a reports trend
- * bucket carries. `formatDate` would re-read it as UTC midnight, which can
- * name the previous day west of Greenwich (see `bucketLabel` in
- * `features/reports/lib/format.ts`), so the parts are rebuilt as a local
- * calendar date instead of going through `new Date(string)`.
- *
- * **Do not "simplify" this to `formatDate(item.localDate, timezone)`.** It
- * looks equivalent and passes for any zone at or east of UTC; it silently
- * prints the day before for a business west of it. This repo has already
- * shipped that exact bug once — `bucketLabel`'s docblock is the postmortem.
- */
-function formatLocalDate(value: string): string {
-  const [year, month, day] = value.split("-").map(Number);
-  if (!year || !month || !day) return value;
-  return format(new Date(year, month - 1, day), "dd MMM yyyy");
-}
 
 /** The first headline a member would actually read, whichever section wrote one. */
 function headlineOf(summary: DigestSummary): string {

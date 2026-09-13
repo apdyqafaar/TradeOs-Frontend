@@ -229,9 +229,7 @@ export function Overview({ name }: { name: string }) {
 
           {/* `undefined` = the API withheld the section (no `reports:view`). `null` =
               it was sent and there is no digest yet. Only the first means render nothing. */}
-          {digest !== undefined ? (
-            <InsightsSection section={digest} timezone={timezone} />
-          ) : null}
+          {digest !== undefined ? <InsightsSection section={digest} /> : null}
 
           {announcements !== undefined || team !== undefined ? (
             <Band
