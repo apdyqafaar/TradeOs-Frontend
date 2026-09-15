@@ -1,6 +1,7 @@
 # API route map
 
-**All 117 endpoints, extracted from `../Backend/src/routes/v1/*.route.ts` on 2026-09-07 (plus `GET /uploads/:id`, added 2026-09-09, and the five AI digest endpoints below, added 2026-09-13) and
+**All 118 endpoints, extracted from `../Backend/src/routes/v1/*.route.ts` on 2026-09-07 (plus `GET /uploads/:id`, added 2026-09-09, the AI digest endpoints below, added 2026-09-13, and
+`GET /digests/quota`, added 2026-09-15) and
 verified against the source, not from memory.** This is the contract the frontend codes against.
 
 ## Rules
@@ -133,9 +134,25 @@ answers 200 with the original `readAt` on a repeat.
 | Method | Path | Requires |
 |---|---|---|
 | GET | `/digests` | reports:view |
+| GET | `/digests/quota` | reports:view |
 | GET | `/digests/latest` | reports:view |
 | GET | `/digests/:id` | reports:view |
 | POST | `/digests/run` | organization:update |
+
+`/digests/quota` was added 2026-09-15 (`Backend` `eafc36e`) and is **`reports:view`, not
+`organization:update`** — reading how many manual runs are left is not spending one, and every
+Insights artboard renders the count, including for a viewer who can never press Generate. It
+answers for a shop with no digest at all, which is the screen the count matters most on.
+
+`POST /digests/run` took no body until 2026-09-15 and now takes an optional one:
+`{ period?: "today"|"last7"|"last30"|"last90"|"year"|"custom", from?, to? }`, where `from`/`to`
+are bare `yyyy-MM-dd` and are **refused with any preset but `custom`** (`.strict()`, so a range
+sent with `last7` is a 422 rather than a silently-ignored filter). Note the asymmetry: the
+request field is `period` and holds a *preset string*, while the 202 answers with a `period`
+*object* (`{preset, from, to}`) — `digest.service.ts` is the one place that maps between them.
+It answers 429 twice over, with different codes: `DIGEST_QUOTA_EXHAUSTED` (today's allowance is
+spent, and `details` carries the same four fields as `/digests/quota`) and the loop shield's bare
+`TOO_MANY_REQUESTS`. Branch on the code.
 
 ### features/organization
 

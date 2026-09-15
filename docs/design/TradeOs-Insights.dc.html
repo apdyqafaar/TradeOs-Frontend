@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#E8E6DE; font-family:'Geist',system-ui,sans-serif; -webkit-font-smoothing:antialiased; font-variant-numeric:tabular-nums; }
+  a { color:#C4643F; text-decoration:none; }
+  a:hover { color:#A8542F; }
+  @keyframes insSpin { to { transform:rotate(360deg); } }
+</style>
+</helmet>
+
+<section style="display:flex;flex-direction:column;gap:64px;padding:64px;box-sizing:border-box">
+
+  <div style="display:flex;align-items:baseline;gap:16px">
+    <span style="font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Turn 1 · /insights</span>
+    <span style="font-family:'Instrument Serif',serif;font-size:30px;color:#1F1E1D">The evening digest — numbers first, prose second, actions biggest</span>
+  </div>
+
+  <!-- ══════════ 1a COMPLETE · DESKTOP · LIGHT ══════════ -->
+  <div id="1a" style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;background:#1F1E1D;color:#F5F4EE;padding:4px 8px;border-radius:6px">1a</span>
+      <span style="font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Complete · desktop 1280 content · light</span>
+    </div>
+    <div style="display:flex;gap:28px;align-items:flex-start">
+      <div style="width:1344px;flex:none;background:#F5F4EE;border:1px solid #E3E1D8;border-radius:12px;box-sizing:border-box;padding:32px;display:flex;flex-direction:column;gap:28px">
+
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-family:'Instrument Serif',serif;font-size:32px;line-height:1.1;color:#1F1E1D">Insights</span>
+            <span style="font-size:13px;color:#6E6D68">Today · Monday, 14 Sep 2026 · written 21:02 · Africa/Mogadishu</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div style="display:flex;padding:3px;border-radius:10px;background:#E8E6DE;border:1px solid #E3E1D8">
+              <sc-for list="{{ periods }}" as="p" hint-placeholder-count="6">
+                <span style="height:32px;padding:0 12px;border-radius:8px;font-size:13px;display:flex;align-items:center;background:{{ p.bg }};color:{{ p.fg }};font-weight:{{ p.w }}">{{ p.label }}</span>
+              </sc-for>
+            </div>
+            <span style="height:38px;padding:0 14px;border-radius:10px;background:#D97757;color:#FBFAF7;font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:8px">
+              <span style="width:15px;height:15px;background:#FBFAF7;mask:url({{ icoSpark }}) center/contain no-repeat;-webkit-mask:url({{ icoSpark }}) center/contain no-repeat"></span>Generate now
+            </span>
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#6E6D68">2 of 3 left today</span>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:8px;font-size:12px;font-weight:500;background:#E4EFE5;color:#3E7049"><span style="width:6px;height:6px;border-radius:50%;background:#4F8A5B"></span>Good day</span>
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#6E6D68">5 of 5 analysts reported</span>
+          </div>
+          <span style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.25;color:#1F1E1D;max-width:720px;text-wrap:pretty">Best Monday in six weeks. Cooking oil carried it, two accounts slipped past due, and maize meal will not last the week.</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+          <sc-for list="{{ heroStats }}" as="c" hint-placeholder-count="4">
+            <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;padding:16px 18px;box-shadow:inset 0 0 0 3px #F5F4EE">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+                <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+                  <span style="font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">{{ c.label }}</span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:28px;font-weight:500;color:#1F1E1D;white-space:nowrap">{{ c.value }}</span>
+                </div>
+                <div style="display:flex;align-items:flex-end;gap:2px;height:36px;flex:none">
+                  <sc-for list="{{ c.spark }}" as="b" hint-placeholder-count="12">
+                    <span style="width:4px;border-radius:1px;height:{{ b.h }};background:{{ b.bg }}"></span>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid #E3E1D8">
+                <span style="width:14px;height:14px;flex:none;background:#A9A7A0;mask:url({{ icoInfo }}) center/contain no-repeat;-webkit-mask:url({{ icoInfo }}) center/contain no-repeat"></span>
+                <span style="font-family:'Geist Mono',monospace;font-size:11px;color:{{ c.deltaColor }}">{{ c.delta }}</span>
+                <span style="font-size:12px;color:#6E6D68">{{ c.foot }}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr);gap:20px;align-items:start">
+
+          <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;overflow:hidden;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#F0EEE6;border-bottom:1px solid #E3E1D8">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#1F1E1D">What to do tomorrow</span>
+                <span style="width:14px;height:14px;background:#A9A7A0;mask:url({{ icoInfo }}) center/contain no-repeat;-webkit-mask:url({{ icoInfo }}) center/contain no-repeat"></span>
+              </div>
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#6E6D68">6 actions · 2 high</span>
+            </div>
+            <sc-for list="{{ actions }}" as="a" hint-placeholder-count="6">
+              <div style="display:flex;align-items:flex-start;gap:14px;padding:16px 20px;border-bottom:1px solid #EFEDE5">
+                <span style="width:22px;height:22px;border-radius:6px;border:1px solid #C9C7BE;background:#FBFAF7;flex:none;margin-top:1px"></span>
+                <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <span style="display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:8px;font-family:'Geist Mono',monospace;font-size:10px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;background:{{ a.pBg }};color:{{ a.pFg }};border:1px solid {{ a.pBd }}">{{ a.priority }}</span>
+                    <span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:#6E6D68">{{ a.kind }}</span>
+                  </div>
+                  <span style="font-size:15px;line-height:1.45;color:#1F1E1D;text-wrap:pretty">{{ a.text }}</span>
+                  <sc-if value="{{ a.figure }}" hint-placeholder-val="{{ true }}">
+                    <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#6E6D68">{{ a.figure }}</span>
+                  </sc-if>
+                </div>
+                <span style="width:16px;height:16px;flex:none;margin-top:4px;background:#A9A7A0;mask:url({{ icoRight }}) center/contain no-repeat;-webkit-mask:url({{ icoRight }}) center/contain no-repeat"></span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:20px;min-width:0">
+            <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#F0EEE6;border-bottom:1px solid #E3E1D8">
+                <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#1F1E1D">Sales · last 7 days</span>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span style="width:7px;height:7px;border-radius:50%;background:#D97757"></span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:#6E6D68">Revenue</span>
+                </div>
+              </div>
+              <div style="padding:20px 20px 16px;display:flex;gap:12px">
+                <div style="display:flex;flex-direction:column;justify-content:space-between;height:140px;flex:none;text-align:right">
+                  <sc-for list="{{ axis }}" as="a" hint-placeholder-count="5">
+                    <span style="font-family:'Geist Mono',monospace;font-size:10px;line-height:1;color:#A9A7A0">{{ a }}</span>
+                  </sc-for>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:8px;min-width:0">
+                  <div style="height:140px;display:flex;align-items:flex-end;gap:12px;border-bottom:1px solid #D8D6CD;background-image:linear-gradient(to top,#E9E7DE 1px,transparent 1px);background-size:100% 25%">
+                    <sc-for list="{{ bars }}" as="b" hint-placeholder-count="7">
+                      <div style="flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px">
+                        <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#6E6D68">{{ b.value }}</span>
+                        <span style="width:100%;max-width:56px;border-radius:6px 6px 0 0;height:{{ b.h }};background:{{ b.bg }}"></span>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;gap:12px">
+                    <sc-for list="{{ bars }}" as="b" hint-placeholder-count="7">
+                      <span style="flex:1;text-align:center;font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:#6E6D68">{{ b.label }}</span>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+              <div style="padding:0 20px 18px;display:flex;flex-direction:column;gap:8px">
+                <span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Sales analyst</span>
+                <span style="font-family:'Instrument Serif',serif;font-size:20px;line-height:1.35;color:#1F1E1D;text-wrap:pretty">Revenue beat last Monday by a fifth. Cooking oil alone was USD 412 — the supplier raise has not slowed it. Two sales after 19:00 were unusual for a Monday.</span>
+                <sc-for list="{{ salesPoints }}" as="p" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:flex-start;gap:9px;padding-top:4px">
+                    <span style="width:5px;height:5px;border-radius:50%;background:#D97757;flex:none;margin-top:7px"></span>
+                    <span style="font-size:13px;line-height:1.55;color:#1F1E1D;text-wrap:pretty">{{ p }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:start">
+
+          <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#F0EEE6;border-bottom:1px solid #E3E1D8">
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#1F1E1D">Debts</span>
+              <a href="#1a" style="font-size:12px;font-weight:500">Open debts</a>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:16px 20px;border-bottom:1px solid #E3E1D8">
+              <div style="display:flex;flex-direction:column;gap:5px"><span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Outstanding</span><span style="font-family:'Geist Mono',monospace;font-size:22px;font-weight:500;color:#1F1E1D">USD 4,120.25</span></div>
+              <div style="display:flex;flex-direction:column;gap:5px"><span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Overdue</span><span style="font-family:'Geist Mono',monospace;font-size:22px;font-weight:500;color:#B33A2A">USD 1,927.25</span></div>
+            </div>
+            <div style="padding:14px 20px;display:flex;flex-direction:column;gap:8px">
+              <span style="font-family:'Instrument Serif',serif;font-size:20px;line-height:1.35;color:#1F1E1D;text-wrap:pretty">Two accounts crossed their due date today. Collected USD 96 against open debts — the lowest weekday in a month.</span>
+            </div>
+            <div style="padding:0 20px 8px">
+              <span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Chase first</span>
+            </div>
+            <sc-for list="{{ chase }}" as="c" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:12px;padding:11px 20px;border-top:1px solid #EFEDE5">
+                <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0">
+                  <span style="font-size:13px;font-weight:500;color:#1F1E1D">{{ c.name }}</span>
+                  <span style="font-size:12px;color:#6E6D68;text-wrap:pretty">{{ c.why }}</span>
+                </span>
+                <span style="font-family:'Geist Mono',monospace;font-size:13px;color:#1F1E1D;flex:none">{{ c.amount }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#F0EEE6;border-bottom:1px solid #E3E1D8">
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#1F1E1D">Stock</span>
+              <a href="#1a" style="font-size:12px;font-weight:500">Low stock</a>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:16px 20px;border-bottom:1px solid #E3E1D8">
+              <div style="display:flex;flex-direction:column;gap:5px"><span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Low</span><span style="font-family:'Geist Mono',monospace;font-size:22px;font-weight:500;color:#8A6A1F">3</span></div>
+              <div style="display:flex;flex-direction:column;gap:5px"><span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Out</span><span style="font-family:'Geist Mono',monospace;font-size:22px;font-weight:500;color:#B33A2A">1</span></div>
+            </div>
+            <div style="padding:14px 20px">
+              <span style="font-family:'Instrument Serif',serif;font-size:20px;line-height:1.35;color:#1F1E1D;text-wrap:pretty">Maize meal sells 6 bags a day and 22 are left. Tuesday is the supplier's day — order before then or Friday is empty.</span>
+            </div>
+            <div style="padding:0 20px 8px">
+              <span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Reorder</span>
+            </div>
+            <sc-for list="{{ reorder }}" as="r" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:7px;padding:11px 20px;border-top:1px solid #EFEDE5">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                  <span style="font-size:13px;font-weight:500;color:#1F1E1D">{{ r.name }}</span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:12px;color:{{ r.fg }};flex:none">{{ r.days }}</span>
+                </div>
+                <span style="height:5px;border-radius:3px;background:#F0EEE6;overflow:hidden;display:block"><span style="display:block;height:5px;border-radius:3px;background:{{ r.bar }};width:{{ r.w }}"></span></span>
+                <span style="font-size:12px;color:#6E6D68;text-wrap:pretty">{{ r.why }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#F0EEE6;border-bottom:1px solid #E3E1D8">
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#1F1E1D">Team &amp; projects</span>
+              <a href="#1a" style="font-size:12px;font-weight:500">Staff report</a>
+            </div>
+            <div style="padding:16px 20px 8px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid #E3E1D8">
+              <sc-for list="{{ staff }}" as="s" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <span style="font-size:13px;color:#1F1E1D;width:96px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.name }}</span>
+                  <span style="flex:1;height:8px;border-radius:4px;background:#F0EEE6;overflow:hidden;display:block"><span style="display:block;height:8px;border-radius:4px;background:#D97757;width:{{ s.w }}"></span></span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#1F1E1D;width:78px;text-align:right;flex:none">{{ s.rev }}</span>
+                </div>
+              </sc-for>
+              <span style="height:8px"></span>
+            </div>
+            <div style="padding:14px 20px">
+              <span style="font-family:'Instrument Serif',serif;font-size:20px;line-height:1.35;color:#1F1E1D;text-wrap:pretty">Yusuf took 12 of 37 sales. The Eastleigh refit moved from 45% to 60% — glass panels are the only thing between it and finishing on time.</span>
+            </div>
+            <div style="padding:0 20px 16px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                <span style="font-size:13px;font-weight:500;color:#1F1E1D">Shopfront refit — Eastleigh</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#1F1E1D">45 → 60%</span>
+              </div>
+              <span style="height:6px;border-radius:3px;background:#F0EEE6;overflow:hidden;display:block;position:relative"><span style="display:block;height:6px;border-radius:3px;background:#EAC7B8;width:60%"></span><span style="position:absolute;left:0;top:0;height:6px;border-radius:3px;background:#D97757;width:45%"></span></span>
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#6E6D68">due 18 Sep · 4 days</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#1F1E1D">Earlier digests</span>
+          </div>
+          <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;overflow:hidden">
+            <sc-for list="{{ history }}" as="h" hint-placeholder-count="4">
+              <div style="display:grid;grid-template-columns:1.1fr 0.9fr 2.6fr 1fr 24px;gap:14px;align-items:center;padding:0 20px;height:48px;border-bottom:1px solid #EFEDE5">
+                <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#1F1E1D">{{ h.date }}</span>
+                <span style="font-size:12px;color:#6E6D68">{{ h.period }}</span>
+                <span style="font-size:13px;color:#1F1E1D;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ h.headline }}</span>
+                <span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:8px;font-size:11px;font-weight:500;justify-self:start;background:{{ h.bg }};color:{{ h.fg }};border:1px solid {{ h.bd }}">{{ h.status }}</span>
+                <span style="width:16px;height:16px;background:#A9A7A0;mask:url({{ icoRight }}) center/contain no-repeat;-webkit-mask:url({{ icoRight }}) center/contain no-repeat"></span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:300px;flex:none;display:flex;flex-direction:column;gap:12px;padding:20px;background:#FBFAF7;border:1px solid #E3E1D8;border-radius:12px;box-sizing:border-box">
+        <span style="font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Build notes · 1a</span>
+        <sc-for list="{{ notesA }}" as="n" hint-placeholder-count="10">
+          <div style="display:flex;gap:10px;padding:8px 0;border-top:1px solid #EFEDE5">
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#6E6D68;width:92px;flex:none">{{ n.k }}</span>
+            <span style="font-size:12px;line-height:1.5;color:#1F1E1D;text-wrap:pretty">{{ n.v }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 1b COMPLETE · DESKTOP · DARK (top half) ══════════ -->
+  <div id="1b" style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;background:#1F1E1D;color:#F5F4EE;padding:4px 8px;border-radius:6px">1b</span>
+      <span style="font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Complete · desktop · dark · above the fold</span>
+    </div>
+    <div style="width:1344px;background:#1C1B19;border:1px solid #3A3833;border-radius:12px;box-sizing:border-box;padding:32px;display:flex;flex-direction:column;gap:28px">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-family:'Instrument Serif',serif;font-size:32px;line-height:1.1;color:#EDEBE5">Insights</span>
+          <span style="font-size:13px;color:#A19F98">Today · Monday, 14 Sep 2026 · written 21:02 · Africa/Mogadishu</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div style="display:flex;padding:3px;border-radius:10px;background:#1F1E1C;border:1px solid #3A3833">
+            <sc-for list="{{ periodsDark }}" as="p" hint-placeholder-count="6">
+              <span style="height:32px;padding:0 12px;border-radius:8px;font-size:13px;display:flex;align-items:center;background:{{ p.bg }};color:{{ p.fg }};font-weight:{{ p.w }}">{{ p.label }}</span>
+            </sc-for>
+          </div>
+          <span style="height:38px;padding:0 14px;border-radius:10px;background:#E08A6B;color:#1C1B19;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:8px">
+            <span style="width:15px;height:15px;background:#1C1B19;mask:url({{ icoSpark }}) center/contain no-repeat;-webkit-mask:url({{ icoSpark }}) center/contain no-repeat"></span>Generate now
+          </span>
+          <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#A19F98">2 of 3 left today</span>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:8px;font-size:12px;font-weight:500;background:rgba(79,138,91,0.22);color:#7FB98C"><span style="width:6px;height:6px;border-radius:50%;background:#7FB98C"></span>Good day</span>
+          <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#A19F98">5 of 5 analysts reported</span>
+        </div>
+        <span style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.25;color:#EDEBE5;max-width:720px;text-wrap:pretty">Best Monday in six weeks. Cooking oil carried it, two accounts slipped past due, and maize meal will not last the week.</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+        <sc-for list="{{ heroStatsDark }}" as="c" hint-placeholder-count="4">
+          <div style="background:#262421;border:1px solid #3A3833;border-radius:10px;padding:16px 18px;box-shadow:inset 0 0 0 3px #1F1E1C">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+              <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+                <span style="font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#A19F98">{{ c.label }}</span>
+                <span style="font-family:'Geist Mono',monospace;font-size:28px;font-weight:500;color:#EDEBE5;white-space:nowrap">{{ c.value }}</span>
+              </div>
+              <div style="display:flex;align-items:flex-end;gap:2px;height:36px;flex:none">
+                <sc-for list="{{ c.spark }}" as="b" hint-placeholder-count="12">
+                  <span style="width:4px;border-radius:1px;height:{{ b.h }};background:{{ b.bg }}"></span>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid #3A3833">
+              <span style="width:14px;height:14px;flex:none;background:#75736D;mask:url({{ icoInfo }}) center/contain no-repeat;-webkit-mask:url({{ icoInfo }}) center/contain no-repeat"></span>
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;color:{{ c.deltaColor }}">{{ c.delta }}</span>
+              <span style="font-size:12px;color:#A19F98">{{ c.foot }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr);gap:20px;align-items:start">
+        <div style="background:#262421;border:1px solid #3A3833;border-radius:10px;overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#2F2D29;border-bottom:1px solid #3A3833">
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#EDEBE5">What to do tomorrow</span>
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#A19F98">6 actions · 2 high</span>
+          </div>
+          <sc-for list="{{ actionsDark }}" as="a" hint-placeholder-count="6">
+            <div style="display:flex;align-items:flex-start;gap:14px;padding:16px 20px;border-bottom:1px solid #322F2B">
+              <span style="width:22px;height:22px;border-radius:6px;border:1px solid #4A4843;background:#262421;flex:none;margin-top:1px"></span>
+              <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <span style="display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:8px;font-family:'Geist Mono',monospace;font-size:10px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;background:{{ a.pBg }};color:{{ a.pFg }};border:1px solid {{ a.pBd }}">{{ a.priority }}</span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:#A19F98">{{ a.kind }}</span>
+                </div>
+                <span style="font-size:15px;line-height:1.45;color:#EDEBE5;text-wrap:pretty">{{ a.text }}</span>
+                <sc-if value="{{ a.figure }}" hint-placeholder-val="{{ true }}">
+                  <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#A19F98">{{ a.figure }}</span>
+                </sc-if>
+              </div>
+              <span style="width:16px;height:16px;flex:none;margin-top:4px;background:#75736D;mask:url({{ icoRight }}) center/contain no-repeat;-webkit-mask:url({{ icoRight }}) center/contain no-repeat"></span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="background:#262421;border:1px solid #3A3833;border-radius:10px;overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#2F2D29;border-bottom:1px solid #3A3833">
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#EDEBE5">Sales · last 7 days</span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="width:7px;height:7px;border-radius:50%;background:#E08A6B"></span>
+              <span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:#A19F98">Revenue</span>
+            </div>
+          </div>
+          <div style="padding:20px 20px 16px;display:flex;gap:12px">
+            <div style="display:flex;flex-direction:column;justify-content:space-between;height:140px;flex:none;text-align:right">
+              <sc-for list="{{ axis }}" as="a" hint-placeholder-count="5">
+                <span style="font-family:'Geist Mono',monospace;font-size:10px;line-height:1;color:#75736D">{{ a }}</span>
+              </sc-for>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:8px;min-width:0">
+              <div style="height:140px;display:flex;align-items:flex-end;gap:12px;border-bottom:1px solid #3E3B36;background-image:linear-gradient(to top,#33312D 1px,transparent 1px);background-size:100% 25%">
+                <sc-for list="{{ barsDark }}" as="b" hint-placeholder-count="7">
+                  <div style="flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px">
+                    <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#A19F98">{{ b.value }}</span>
+                    <span style="width:100%;max-width:56px;border-radius:6px 6px 0 0;height:{{ b.h }};background:{{ b.bg }}"></span>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display:flex;gap:12px">
+                <sc-for list="{{ barsDark }}" as="b" hint-placeholder-count="7">
+                  <span style="flex:1;text-align:center;font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:#A19F98">{{ b.label }}</span>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+          <div style="padding:0 20px 18px;display:flex;flex-direction:column;gap:8px">
+            <span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#A19F98">Sales analyst</span>
+            <span style="font-family:'Instrument Serif',serif;font-size:20px;line-height:1.35;color:#EDEBE5;text-wrap:pretty">Revenue beat last Monday by a fifth. Cooking oil alone was USD 412 — the supplier raise has not slowed it. Two sales after 19:00 were unusual for a Monday.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 1c PHONE · complete light + dark ══════════ -->
+  <div id="1c" style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;background:#1F1E1D;color:#F5F4EE;padding:4px 8px;border-radius:6px">1c</span>
+      <span style="font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Phone 390 · complete · light &amp; dark · order: verdict → 2 figures → actions → sections collapsed</span>
+    </div>
+    <div style="display:flex;gap:28px;align-items:flex-start">
+
+      <div style="width:390px;flex:none;background:#F5F4EE;border:1px solid #D8D6CD;border-radius:28px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column">
+        <div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid #E3E1D8">
+          <span style="width:18px;height:18px;background:#6E6D68;mask:url({{ icoBack }}) center/contain no-repeat;-webkit-mask:url({{ icoBack }}) center/contain no-repeat"></span>
+          <span style="font-size:15px;font-weight:500;color:#1F1E1D;flex:1">Insights</span>
+          <span style="height:34px;padding:0 12px;border-radius:9px;background:#D97757;color:#FBFAF7;font-size:12px;font-weight:500;display:inline-flex;align-items:center">Generate</span>
+        </div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px">
+            <sc-for list="{{ periods }}" as="p" hint-placeholder-count="6">
+              <span style="height:32px;padding:0 12px;border-radius:8px;font-size:12px;display:inline-flex;align-items:center;white-space:nowrap;flex:none;background:{{ p.mBg }};color:{{ p.mFg }};border:1px solid {{ p.mBd }};font-weight:{{ p.w }}">{{ p.label }}</span>
+            </sc-for>
+          </div>
+          <span style="font-size:12px;color:#6E6D68">Monday, 14 Sep · written 21:02</span>
+
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:8px;font-size:12px;font-weight:500;background:#E4EFE5;color:#3E7049"><span style="width:6px;height:6px;border-radius:50%;background:#4F8A5B"></span>Good day</span>
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#6E6D68">5 of 5</span>
+            </div>
+            <span style="font-family:'Instrument Serif',serif;font-size:24px;line-height:1.25;color:#1F1E1D;text-wrap:pretty">Best Monday in six weeks. Cooking oil carried it, two accounts slipped past due.</span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Revenue</span>
+              <span style="font-family:'Geist Mono',monospace;font-size:20px;font-weight:500;color:#1F1E1D;white-space:nowrap">USD 1,846.50</span>
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#3E7049">+21.4% <span style="color:#6E6D68;font-family:'Geist',sans-serif">vs last Mon</span></span>
+            </div>
+            <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Overdue</span>
+              <span style="font-family:'Geist Mono',monospace;font-size:20px;font-weight:500;color:#B33A2A;white-space:nowrap">USD 1,927.25</span>
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#B33A2A">+2 <span style="color:#6E6D68;font-family:'Geist',sans-serif">accounts today</span></span>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:flex-end;gap:6px;height:56px;padding:0 2px">
+            <sc-for list="{{ bars }}" as="b" hint-placeholder-count="7">
+              <span style="flex:1;border-radius:4px 4px 0 0;height:{{ b.h }};background:{{ b.bg }}"></span>
+            </sc-for>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:-10px">
+            <sc-for list="{{ bars }}" as="b" hint-placeholder-count="7">
+              <span style="flex:1;text-align:center;font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:0.04em;color:#A9A7A0">{{ b.label }}</span>
+            </sc-for>
+          </div>
+
+          <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:#F0EEE6;border-bottom:1px solid #E3E1D8">
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#1F1E1D">Tomorrow</span>
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#6E6D68">6 · 2 high</span>
+            </div>
+            <sc-for list="{{ actionsMobile }}" as="a" hint-placeholder-count="3">
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:14px;border-bottom:1px solid #EFEDE5">
+                <span style="width:22px;height:22px;border-radius:6px;border:1px solid #C9C7BE;background:#FBFAF7;flex:none"></span>
+                <div style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:7px;font-family:'Geist Mono',monospace;font-size:10px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;background:{{ a.pBg }};color:{{ a.pFg }};border:1px solid {{ a.pBd }}">{{ a.priority }}</span>
+                    <span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:#6E6D68">{{ a.kind }}</span>
+                  </div>
+                  <span style="font-size:14px;line-height:1.45;color:#1F1E1D;text-wrap:pretty">{{ a.text }}</span>
+                </div>
+              </div>
+            </sc-for>
+            <div style="padding:12px 14px;text-align:center"><a href="#1c" style="font-size:13px;font-weight:500">Show 3 more</a></div>
+          </div>
+
+          <sc-for list="{{ mobileSections }}" as="s" hint-placeholder-count="4">
+            <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;padding:14px;display:flex;align-items:center;gap:12px">
+              <span style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0">
+                <span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">{{ s.label }}</span>
+                <span style="font-size:13px;line-height:1.45;color:#1F1E1D;text-wrap:pretty">{{ s.one }}</span>
+              </span>
+              <span style="font-family:'Geist Mono',monospace;font-size:14px;font-weight:500;color:{{ s.fg }};flex:none;white-space:nowrap">{{ s.figure }}</span>
+              <span style="width:16px;height:16px;flex:none;background:#A9A7A0;mask:url({{ icoDown }}) center/contain no-repeat;-webkit-mask:url({{ icoDown }}) center/contain no-repeat"></span>
+            </div>
+          </sc-for>
+
+          <span style="font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68;padding-top:4px">Earlier</span>
+          <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;overflow:hidden">
+            <sc-for list="{{ history }}" as="h" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #EFEDE5">
+                <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0">
+                  <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#1F1E1D">{{ h.date }} <span style="color:#6E6D68">· {{ h.period }}</span></span>
+                  <span style="font-size:12px;color:#6E6D68;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ h.headline }}</span>
+                </span>
+                <span style="display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:8px;font-size:11px;font-weight:500;background:{{ h.bg }};color:{{ h.fg }};border:1px solid {{ h.bd }};flex:none">{{ h.status }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:390px;flex:none;background:#1C1B19;border:1px solid #3A3833;border-radius:28px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column">
+        <div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid #3A3833">
+          <span style="width:18px;height:18px;background:#A19F98;mask:url({{ icoBack }}) center/contain no-repeat;-webkit-mask:url({{ icoBack }}) center/contain no-repeat"></span>
+          <span style="font-size:15px;font-weight:500;color:#EDEBE5;flex:1">Insights</span>
+          <span style="height:34px;padding:0 12px;border-radius:9px;background:#E08A6B;color:#1C1B19;font-size:12px;font-weight:600;display:inline-flex;align-items:center">Generate</span>
+        </div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px">
+            <sc-for list="{{ periodsDark }}" as="p" hint-placeholder-count="6">
+              <span style="height:32px;padding:0 12px;border-radius:8px;font-size:12px;display:inline-flex;align-items:center;white-space:nowrap;flex:none;background:{{ p.mBg }};color:{{ p.mFg }};border:1px solid {{ p.mBd }};font-weight:{{ p.w }}">{{ p.label }}</span>
+            </sc-for>
+          </div>
+          <span style="font-size:12px;color:#A19F98">Monday, 14 Sep · written 21:02</span>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:8px;font-size:12px;font-weight:500;background:rgba(79,138,91,0.22);color:#7FB98C"><span style="width:6px;height:6px;border-radius:50%;background:#7FB98C"></span>Good day</span>
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#A19F98">5 of 5</span>
+            </div>
+            <span style="font-family:'Instrument Serif',serif;font-size:24px;line-height:1.25;color:#EDEBE5;text-wrap:pretty">Best Monday in six weeks. Cooking oil carried it, two accounts slipped past due.</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div style="background:#262421;border:1px solid #3A3833;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#A19F98">Revenue</span>
+              <span style="font-family:'Geist Mono',monospace;font-size:20px;font-weight:500;color:#EDEBE5;white-space:nowrap">USD 1,846.50</span>
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#7FB98C">+21.4% <span style="color:#A19F98;font-family:'Geist',sans-serif">vs last Mon</span></span>
+            </div>
+            <div style="background:#262421;border:1px solid #3A3833;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#A19F98">Overdue</span>
+              <span style="font-family:'Geist Mono',monospace;font-size:20px;font-weight:500;color:#E0705F;white-space:nowrap">USD 1,927.25</span>
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#E0705F">+2 <span style="color:#A19F98;font-family:'Geist',sans-serif">accounts today</span></span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:6px;height:56px;padding:0 2px">
+            <sc-for list="{{ barsDark }}" as="b" hint-placeholder-count="7">
+              <span style="flex:1;border-radius:4px 4px 0 0;height:{{ b.h }};background:{{ b.bg }}"></span>
+            </sc-for>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:-10px">
+            <sc-for list="{{ barsDark }}" as="b" hint-placeholder-count="7">
+              <span style="flex:1;text-align:center;font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:0.04em;color:#75736D">{{ b.label }}</span>
+            </sc-for>
+          </div>
+          <div style="background:#262421;border:1px solid #3A3833;border-radius:10px;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:#2F2D29;border-bottom:1px solid #3A3833">
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#EDEBE5">Tomorrow</span>
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#A19F98">6 · 2 high</span>
+            </div>
+            <sc-for list="{{ actionsMobileDark }}" as="a" hint-placeholder-count="3">
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:14px;border-bottom:1px solid #322F2B">
+                <span style="width:22px;height:22px;border-radius:6px;border:1px solid #4A4843;background:#262421;flex:none"></span>
+                <div style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:7px;font-family:'Geist Mono',monospace;font-size:10px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;background:{{ a.pBg }};color:{{ a.pFg }};border:1px solid {{ a.pBd }}">{{ a.priority }}</span>
+                    <span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:#A19F98">{{ a.kind }}</span>
+                  </div>
+                  <span style="font-size:14px;line-height:1.45;color:#EDEBE5;text-wrap:pretty">{{ a.text }}</span>
+                </div>
+              </div>
+            </sc-for>
+            <div style="padding:12px 14px;text-align:center"><a href="#1c" style="font-size:13px;font-weight:500;color:#E08A6B">Show 3 more</a></div>
+          </div>
+          <sc-for list="{{ mobileSectionsDark }}" as="s" hint-placeholder-count="4">
+            <div style="background:#262421;border:1px solid #3A3833;border-radius:10px;padding:14px;display:flex;align-items:center;gap:12px">
+              <span style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0">
+                <span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#A19F98">{{ s.label }}</span>
+                <span style="font-size:13px;line-height:1.45;color:#EDEBE5;text-wrap:pretty">{{ s.one }}</span>
+              </span>
+              <span style="font-family:'Geist Mono',monospace;font-size:14px;font-weight:500;color:{{ s.fg }};flex:none;white-space:nowrap">{{ s.figure }}</span>
+              <span style="width:16px;height:16px;flex:none;background:#75736D;mask:url({{ icoDown }}) center/contain no-repeat;-webkit-mask:url({{ icoDown }}) center/contain no-repeat"></span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="width:300px;flex:none;display:flex;flex-direction:column;gap:12px;padding:20px;background:#FBFAF7;border:1px solid #E3E1D8;border-radius:12px;box-sizing:border-box">
+        <span style="font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Build notes · phone</span>
+        <sc-for list="{{ notesC }}" as="n" hint-placeholder-count="7">
+          <div style="display:flex;gap:10px;padding:8px 0;border-top:1px solid #EFEDE5">
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#6E6D68;width:92px;flex:none">{{ n.k }}</span>
+            <span style="font-size:12px;line-height:1.5;color:#1F1E1D;text-wrap:pretty">{{ n.v }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 1d PARTIAL ══════════ -->
+  <div id="1d" style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;background:#1F1E1D;color:#F5F4EE;padding:4px 8px;border-radius:6px">1d</span>
+      <span style="font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Partial · stock &amp; team analysts did not finish · desktop light</span>
+    </div>
+    <div style="display:flex;gap:28px;align-items:flex-start">
+      <div style="width:1344px;flex:none;background:#F5F4EE;border:1px solid #E3E1D8;border-radius:12px;box-sizing:border-box;padding:32px;display:flex;flex-direction:column;gap:28px">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-family:'Instrument Serif',serif;font-size:32px;line-height:1.1;color:#1F1E1D">Insights</span>
+            <span style="font-size:13px;color:#6E6D68">Today · Saturday, 12 Sep 2026 · written 21:04 · Africa/Mogadishu</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div style="display:flex;padding:3px;border-radius:10px;background:#E8E6DE;border:1px solid #E3E1D8">
+              <sc-for list="{{ periods }}" as="p" hint-placeholder-count="6">
+                <span style="height:32px;padding:0 12px;border-radius:8px;font-size:13px;display:flex;align-items:center;background:{{ p.bg }};color:{{ p.fg }};font-weight:{{ p.w }}">{{ p.label }}</span>
+              </sc-for>
+            </div>
+            <span style="height:38px;padding:0 14px;border-radius:10px;background:#D97757;color:#FBFAF7;font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:8px">
+              <span style="width:15px;height:15px;background:#FBFAF7;mask:url({{ icoSpark }}) center/contain no-repeat;-webkit-mask:url({{ icoSpark }}) center/contain no-repeat"></span>Run again
+            </span>
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#6E6D68">1 of 3 left today</span>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:8px;font-size:12px;font-weight:500;background:#E4EFE5;color:#3E7049"><span style="width:6px;height:6px;border-radius:50%;background:#4F8A5B"></span>Good day</span>
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#6E6D68">3 of 5 analysts reported</span>
+            <span style="width:1px;height:14px;background:#D8D6CD"></span>
+            <div style="display:flex;gap:6px">
+              <sc-for list="{{ partialPresent }}" as="s" hint-placeholder-count="5">
+                <span style="display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:7px;font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.04em;background:{{ s.bg }};color:{{ s.fg }};border:1px solid {{ s.bd }}">
+                  <span style="width:10px;height:10px;background:{{ s.fg }};mask:url({{ s.icon }}) center/contain no-repeat;-webkit-mask:url({{ s.icon }}) center/contain no-repeat"></span>{{ s.label }}
+                </span>
+              </sc-for>
+            </div>
+          </div>
+          <span style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.25;color:#1F1E1D;max-width:720px;text-wrap:pretty">Saturday revenue up a third on last week. Two debts crossed due. Stock and team were not read tonight.</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+          <sc-for list="{{ heroStats }}" as="c" hint-placeholder-count="4">
+            <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;padding:16px 18px;box-shadow:inset 0 0 0 3px #F5F4EE">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+                <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+                  <span style="font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">{{ c.label }}</span>
+                  <span style="font-family:'Geist Mono',monospace;font-size:28px;font-weight:500;color:#1F1E1D;white-space:nowrap">{{ c.value }}</span>
+                </div>
+                <div style="display:flex;align-items:flex-end;gap:2px;height:36px;flex:none">
+                  <sc-for list="{{ c.spark }}" as="b" hint-placeholder-count="12">
+                    <span style="width:4px;border-radius:1px;height:{{ b.h }};background:{{ b.bg }}"></span>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid #E3E1D8">
+                <span style="width:14px;height:14px;flex:none;background:#A9A7A0;mask:url({{ icoInfo }}) center/contain no-repeat;-webkit-mask:url({{ icoInfo }}) center/contain no-repeat"></span>
+                <span style="font-family:'Geist Mono',monospace;font-size:11px;color:{{ c.deltaColor }}">{{ c.delta }}</span>
+                <span style="font-size:12px;color:#6E6D68">{{ c.foot }}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr);gap:20px;align-items:start">
+          <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#F0EEE6;border-bottom:1px solid #E3E1D8">
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#1F1E1D">What to do tomorrow</span>
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#6E6D68">4 actions · 2 high · no stock actions tonight</span>
+            </div>
+            <sc-for list="{{ partialActions }}" as="a" hint-placeholder-count="4">
+              <div style="display:flex;align-items:flex-start;gap:14px;padding:16px 20px;border-bottom:1px solid #EFEDE5">
+                <span style="width:22px;height:22px;border-radius:6px;border:1px solid #C9C7BE;background:#FBFAF7;flex:none;margin-top:1px"></span>
+                <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <span style="display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:8px;font-family:'Geist Mono',monospace;font-size:10px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;background:{{ a.pBg }};color:{{ a.pFg }};border:1px solid {{ a.pBd }}">{{ a.priority }}</span>
+                    <span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:#6E6D68">{{ a.kind }}</span>
+                  </div>
+                  <span style="font-size:15px;line-height:1.45;color:#1F1E1D;text-wrap:pretty">{{ a.text }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:20px;min-width:0">
+            <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#F0EEE6;border-bottom:1px solid #E3E1D8">
+                <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#1F1E1D">Debts</span>
+                <a href="#1d" style="font-size:12px;font-weight:500">Open debts</a>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:16px 20px;border-bottom:1px solid #E3E1D8">
+                <div style="display:flex;flex-direction:column;gap:5px"><span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Outstanding</span><span style="font-family:'Geist Mono',monospace;font-size:22px;font-weight:500;color:#1F1E1D">USD 4,120.25</span></div>
+                <div style="display:flex;flex-direction:column;gap:5px"><span style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Overdue</span><span style="font-family:'Geist Mono',monospace;font-size:22px;font-weight:500;color:#B33A2A">USD 1,927.25</span></div>
+              </div>
+              <div style="padding:14px 20px 18px">
+                <span style="font-family:'Instrument Serif',serif;font-size:20px;line-height:1.35;color:#1F1E1D;text-wrap:pretty">Two accounts crossed their due date today. Nasra Ali is the one to call first — no payment has ever been recorded.</span>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;height:56px;padding:0 20px;border:1px dashed #D8D6CD;border-radius:10px;background:transparent">
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Stock</span>
+              <span style="font-size:13px;color:#6E6D68;flex:1">The stock analyst did not finish tonight. Live figures are still on <a href="#1d" style="font-weight:500">Low stock</a>.</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;height:56px;padding:0 20px;border:1px dashed #D8D6CD;border-radius:10px;background:transparent">
+              <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Team &amp; projects</span>
+              <span style="font-size:13px;color:#6E6D68;flex:1">Not read tonight. <a href="#1d" style="font-weight:500">Run again</a> to include it.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:300px;flex:none;display:flex;flex-direction:column;gap:12px;padding:20px;background:#FBFAF7;border:1px solid #E3E1D8;border-radius:12px;box-sizing:border-box">
+        <span style="font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Build notes · states</span>
+        <sc-for list="{{ notesD }}" as="n" hint-placeholder-count="5">
+          <div style="display:flex;gap:10px;padding:8px 0;border-top:1px solid #EFEDE5">
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#6E6D68;width:92px;flex:none">{{ n.k }}</span>
+            <span style="font-size:12px;line-height:1.5;color:#1F1E1D;text-wrap:pretty">{{ n.v }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 1e FAILED · NO DIGEST · OFF · GENERATING ══════════ -->
+  <div id="1e" style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;background:#1F1E1D;color:#F5F4EE;padding:4px 8px;border-radius:6px">1e</span>
+      <span style="font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6E6D68">Failed · no digest yet · switched off · generating — content area 640, light &amp; dark</span>
+    </div>
+    <div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap">
+
+      <div style="width:640px;flex:none;background:#F5F4EE;border:1px solid #E3E1D8;border-radius:12px;box-sizing:border-box;padding:32px;display:flex;flex-direction:column;gap:24px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-family:'Instrument Serif',serif;font-size:32px;line-height:1.1;color:#1F1E1D">Insights</span>
+          <span style="font-size:13px;color:#6E6D68">Today · Monday, 07 Sep 2026</span>
+        </div>
+        <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;padding:28px;display:flex;flex-direction:column;gap:14px">
+          <span style="display:inline-flex;align-self:flex-start;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:8px;font-size:12px;font-weight:500;background:#F6E0DC;color:#B33A2A"><span style="width:6px;height:6px;border-radius:50%;background:#C0392B"></span>Failed</span>
+          <span style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.2;color:#1F1E1D;text-wrap:pretty">Tonight's digest was not written.</span>
+          <span style="font-size:14px;line-height:1.6;color:#6E6D68;text-wrap:pretty">The analysts started at 21:00 and stopped before any section finished. Your sales, debts and stock are untouched — only the summary is missing.</span>
+          <div style="display:flex;align-items:center;gap:12px;padding-top:4px">
+            <span style="height:38px;padding:0 14px;border-radius:10px;background:#D97757;color:#FBFAF7;font-size:13px;font-weight:500;display:inline-flex;align-items:center">Run again</span>
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#6E6D68">2 of 3 left today</span>
+            <span style="flex:1"></span>
+            <span style="font-family:'Geist Mono',monospace;font-size:10px;color:#A9A7A0">Request ID 7c1f0ab93e</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#1F1E1D">Earlier digests</span>
+          <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;overflow:hidden">
+            <sc-for list="{{ history }}" as="h" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:12px;padding:0 18px;height:48px;border-bottom:1px solid #EFEDE5">
+                <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#1F1E1D;width:96px;flex:none">{{ h.date }}</span>
+                <span style="font-size:13px;color:#1F1E1D;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ h.headline }}</span>
+                <span style="display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:8px;font-size:11px;font-weight:500;flex:none;background:{{ h.bg }};color:{{ h.fg }};border:1px solid {{ h.bd }}">{{ h.status }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:640px;flex:none;background:#1C1B19;border:1px solid #3A3833;border-radius:12px;box-sizing:border-box;padding:32px;display:flex;flex-direction:column;gap:24px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-family:'Instrument Serif',serif;font-size:32px;line-height:1.1;color:#EDEBE5">Insights</span>
+          <span style="font-size:13px;color:#A19F98">Today · Tuesday, 15 Sep 2026</span>
+        </div>
+        <div style="padding:56px 24px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px">
+          <span style="width:52px;height:52px;border-radius:12px;background:#2F2D29;border:1px solid #3A3833;display:flex;align-items:center;justify-content:center;margin-bottom:6px">
+            <span style="width:22px;height:22px;background:#A19F98;mask:url({{ icoMoon }}) center/contain no-repeat;-webkit-mask:url({{ icoMoon }}) center/contain no-repeat"></span>
+          </span>
+          <span style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.2;color:#EDEBE5">Tonight's digest arrives at 21:00.</span>
+          <span style="font-size:14px;line-height:1.6;color:#A19F98;max-width:380px;text-wrap:pretty">The analysts read the whole day after closing. You can generate one now for the day so far.</span>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
+            <span style="height:38px;padding:0 14px;border-radius:10px;background:#E08A6B;color:#1C1B19;font-size:13px;font-weight:600;display:inline-flex;align-items:center">Generate now</span>
+            <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#A19F98">3 of 3 left today</span>
+          </div>
+        </div>
+        <div style="height:1px;background:#3A3833"></div>
+        <div style="padding:8px 0 0;display:flex;flex-direction:column;gap:12px">
+          <span style="font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#A19F98">Switched off · variant</span>
+          <div style="display:flex;align-items:flex-start;gap:14px;padding:18px 20px;border:1px solid #3A3833;border-radius:10px;background:#262421">
+            <span style="width:34px;height:34px;border-radius:9px;background:#2F2D29;display:flex;align-items:center;justify-content:center;flex:none">
+              <span style="width:17px;height:17px;background:#A19F98;mask:url({{ icoSettings }}) center/contain no-repeat;-webkit-mask:url({{ icoSettings }}) center/contain no-repeat"></span>
+            </span>
+            <span style="display:flex;flex-direction:column;gap:5px">
+              <span style="font-family:'Instrument Serif',serif;font-size:22px;line-height:1.2;color:#EDEBE5">The evening digest is off for this shop.</span>
+              <span style="font-size:13px;line-height:1.6;color:#A19F98;text-wrap:pretty">Nothing is read or written while it is off. Turn it on in <a href="#1e" style="font-weight:500;color:#E08A6B">Settings › Insights</a> and tonight's will run at 21:00.</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:640px;flex:none;background:#F5F4EE;border:1px solid #E3E1D8;border-radius:12px;box-sizing:border-box;padding:32px;display:flex;flex-direction:column;gap:24px">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-family:'Instrument Serif',serif;font-size:32px;line-height:1.1;color:#1F1E1D">Insights</span>
+            <span style="font-size:13px;color:#6E6D68">Last 7 days · 08 – 14 Sep 2026</span>
+          </div>
+          <span style="height:38px;padding:0 14px;border:1px solid #E3E1D8;border-radius:10px;background:#FBFAF7;font-size:13px;font-weight:500;color:#1F1E1D;display:inline-flex;align-items:center;gap:9px">
+            <span style="width:15px;height:15px;border-radius:50%;border:2px solid #E3E1D8;border-top-color:#D97757;box-sizing:border-box;animation:insSpin 0.9s linear infinite"></span>
+            Generating <span style="font-family:'Geist Mono',monospace;font-size:12px;color:#6E6D68">0:23</span>
+          </span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <span style="font-family:'Geist Mono',monospace;font-size:11px;color:#6E6D68">Reading 7 days of sales, 24 debts and 128 products. Usually under a minute.</span>
+          <span style="width:360px;height:22px;border-radius:6px;background:#EAE8DF"></span>
+          <span style="width:520px;height:22px;border-radius:6px;background:#EAE8DF"></span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+          <sc-for list="{{ skeletons }}" as="k" hint-placeholder-count="4">
+            <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;gap:12px">
+              <span style="width:70px;height:9px;border-radius:4px;background:#EAE8DF"></span>
+              <span style="height:22px;border-radius:5px;background:#EAE8DF;width:{{ k }}"></span>
+              <span style="width:90px;height:8px;border-radius:4px;background:#F0EEE6;margin-top:6px"></span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr);gap:20px">
+          <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;padding:18px 20px;display:flex;flex-direction:column;gap:14px">
+            <span style="width:140px;height:9px;border-radius:4px;background:#EAE8DF"></span>
+            <span style="height:14px;border-radius:5px;background:#EAE8DF;width:92%"></span>
+            <span style="height:14px;border-radius:5px;background:#EAE8DF;width:78%"></span>
+            <span style="height:14px;border-radius:5px;background:#EAE8DF;width:85%"></span>
+          </div>
+          <div style="background:#FBFAF7;border:1px solid #E3E1D8;border-radius:10px;padding:18px 20px;display:flex;flex-direction:column;gap:14px">
+            <span style="width:110px;height:9px;border-radius:4px;background:#EAE8DF"></span>
+            <div style="display:flex;align-items:flex-end;gap:8px;height:70px">
+              <sc-for list="{{ skelBars }}" as="b" hint-placeholder-count="7">
+                <span style="flex:1;border-radius:4px 4px 0 0;background:#EAE8DF;height:{{ b }}"></span>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1700,&quot;height&quot;:1200}}">
+class Component extends DCLogic {
+  ic(n) {
+    const P = {
+      info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+      spark: '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M6.2 6.2l3 3M14.8 14.8l3 3M17.8 6.2l-3 3M9.2 14.8l-3 3"/>',
+      right: '<path d="m10 6 6 6-6 6"/>',
+      down: '<path d="m6 9.5 6 6 6-6"/>',
+      check: '<path d="m5 13 4.5 4.5L19 7"/>',
+      alert: '<path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17h.01"/>',
+      clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5.5l3.5 2"/>',
+      moon: '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"/>',
+      settings: '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3"/>',
+      cal: '<rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+      back: '<path d="m14 6-6 6 6 6"/>',
+      minus: '<path d="M6 12h12"/>'
+    };
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + (P[n] || P.info) + '</svg>';
+    return '"data:image/svg+xml,' + encodeURIComponent(svg) + '"';
+  }
+
+  spark(vals, on, dim) {
+    const N = 12, pts = [];
+    for (let i = 0; i < N; i++) {
+      const t = i / (N - 1) * (vals.length - 1), a = Math.floor(t), b = Math.min(vals.length - 1, a + 1);
+      pts.push(vals[a] + (vals[b] - vals[a]) * (t - a));
+    }
+    const max = Math.max.apply(null, pts);
+    return pts.map((v, i) => ({ h: Math.max(12, Math.round(v / max * 100)) + '%', bg: i === N - 1 ? on : dim }));
+  }
+
+  bars(vals, labels, on, dim, hi) {
+    const top = Math.ceil(Math.max.apply(null, vals) / 500) * 500;
+    return vals.map((v, i) => ({ label: labels[i], h: Math.round(v / top * 100) + '%', value: v.toLocaleString('en-US'), bg: i === hi ? on : dim }));
+  }
+
+  axis(vals, ticks) {
+    const top = Math.ceil(Math.max.apply(null, vals) / 500) * 500, out = [];
+    for (let i = ticks; i >= 0; i--) { const v = top / ticks * i; out.push(v >= 1000 ? (v / 1000).toFixed(v % 1000 === 0 ? 0 : 1) + 'k' : String(v)); }
+    return out;
+  }
+
+  theme(dark) {
+    return dark
+      ? { bg: '#1C1B19', sf: '#262421', sf2: '#2F2D29', bd: '#3A3833', bd2: '#322F2B', tx: '#EDEBE5', mu: '#A19F98', su: '#75736D', ac: '#E08A6B', acDim: '#4A3A33', good: '#7FB98C', goodS: 'rgba(79,138,91,0.22)', warn: '#D6A445', warnS: 'rgba(184,134,43,0.20)', bad: '#E0705F', badS: 'rgba(192,57,43,0.22)', grid: '#33312D', base: '#3E3B36', inset: '#1F1E1C' }
+      : { bg: '#F5F4EE', sf: '#FBFAF7', sf2: '#F0EEE6', bd: '#E3E1D8', bd2: '#EFEDE5', tx: '#1F1E1D', mu: '#6E6D68', su: '#A9A7A0', ac: '#D97757', acDim: '#F0DCD2', good: '#3E7049', goodS: '#E4EFE5', warn: '#8A6A1F', warnS: '#F5ECD6', bad: '#B33A2A', badS: '#F6E0DC', grid: '#E9E7DE', base: '#D8D6CD', inset: '#F5F4EE' };
+  }
+
+  renderVals() {
+    const L = this.theme(false), D = this.theme(true);
+    const days = ['TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN', 'MON'];
+    const rev = [1140, 640, 1580, 1320, 1760, 1450, 1846];
+    const prio = (p, T) => p === 'High' ? { pBg: T.badS, pFg: T.bad, pBd: T.badS } : p === 'Medium' ? { pBg: T.warnS, pFg: T.warn, pBd: T.warnS } : { pBg: 'transparent', pFg: T.mu, pBd: T.base };
+    const mkActions = (T) => [
+      { priority: 'High', kind: 'Chase', text: 'Call Nasra Ali about USD 380.75 — 25 days overdue and no payment yet.', figure: 'USD 380.75 · due 20 Aug' },
+      { priority: 'High', kind: 'Restock', text: 'Order 40 bags of maize meal before Tuesday\u2019s delivery window.', figure: '22 pcs left · 6 a day' },
+      { priority: 'Medium', kind: 'Review', text: 'Cooking oil margin is 19.4% after the supplier raise. Decide whether to move the price.', figure: 'was 27.8%' },
+      { priority: 'Medium', kind: 'Chase', text: 'Remind Mwangi Stores their USD 167.75 is due Monday — they pay late but in full.', figure: 'due 21 Sep' },
+      { priority: 'Low', kind: 'Project', text: 'Confirm the glass panel delivery for the Eastleigh refit.', figure: 'due 18 Sep' },
+      { priority: 'Low', kind: 'Promote', text: 'Bar soap has 48 in stock and sold 4. Put a six-pack offer at the counter.', figure: '' }
+    ].map(a => Object.assign(a, prio(a.priority, T)));
+
+    const mkStats = (T) => [
+      { label: 'Revenue', value: 'USD 1,846.50', spark: this.spark(rev, T.ac, T.acDim), delta: '+21.4%', deltaColor: T.good, foot: 'vs last Monday' },
+      { label: 'Gross profit', value: 'USD 512.20', spark: this.spark([190, 90, 240, 160, 260, 210, 512], T.ac, T.acDim), delta: '+8.1%', deltaColor: T.good, foot: '27.7% margin' },
+      { label: 'Collected on debts', value: 'USD 96.00', spark: this.spark([210, 180, 240, 60, 0, 40, 96], T.ac, T.acDim), delta: '\u221254.3%', deltaColor: T.bad, foot: 'vs 7-day average' },
+      { label: 'Sales', value: '37', spark: this.spark([14, 8, 17, 12, 21, 19, 37], T.ac, T.acDim), delta: '+6', deltaColor: T.good, foot: 'receipts' }
+    ];
+
+    const mkHistory = (T) => [
+      { date: '13 Sep 2026', period: 'Today', headline: 'Quiet Sunday. Collected USD 240 on debts, nothing overdue moved.', status: 'Complete', bg: T.goodS, fg: T.good, bd: T.goodS },
+      { date: '12 Sep 2026', period: 'Today', headline: 'Saturday revenue up, two analysts did not finish.', status: 'Partial', bg: T.warnS, fg: T.warn, bd: T.warnS },
+      { date: '08 Sep 2026', period: 'Last 7 days', headline: 'Best week since June; oil and rice drove it.', status: 'Complete', bg: T.goodS, fg: T.good, bd: T.goodS },
+      { date: '07 Sep 2026', period: 'Today', headline: 'Run failed \u2014 nothing was written.', status: 'Failed', bg: 'transparent', fg: T.mu, bd: T.base }
+    ];
+
+    return {
+      icoInfo: this.ic('info'), icoSpark: this.ic('spark'), icoRight: this.ic('right'), icoDown: this.ic('down'),
+      icoCheck: this.ic('check'), icoAlert: this.ic('alert'), icoClock: this.ic('clock'), icoMoon: this.ic('moon'),
+      icoSettings: this.ic('settings'), icoCal: this.ic('cal'), icoBack: this.ic('back'),
+
+      periods: ['Today', '7 days', '30 days', '90 days', 'This year', 'Custom'].map((l, i) => ({ label: l, bg: i === 0 ? '#FBFAF7' : 'transparent', fg: i === 0 ? '#1F1E1D' : '#6E6D68', w: i === 0 ? 500 : 400, mBg: i === 0 ? '#1F1E1D' : '#FBFAF7', mFg: i === 0 ? '#F5F4EE' : '#1F1E1D', mBd: i === 0 ? '#1F1E1D' : '#E3E1D8' })),
+      periodsDark: ['Today', '7 days', '30 days', '90 days', 'This year', 'Custom'].map((l, i) => ({ label: l, bg: i === 0 ? '#3A3833' : 'transparent', fg: i === 0 ? '#EDEBE5' : '#A19F98', w: i === 0 ? 500 : 400, mBg: i === 0 ? '#EDEBE5' : '#262421', mFg: i === 0 ? '#1F1E1D' : '#EDEBE5', mBd: i === 0 ? '#EDEBE5' : '#3A3833' })),
+      actionsMobile: mkActions(L).slice(0, 3),
+      actionsMobileDark: mkActions(D).slice(0, 3),
+      mobileSections: [
+        { label: 'Sales', one: 'Cooking oil carried the day — USD 412.', figure: '+21.4%', fg: L.good },
+        { label: 'Debts', one: 'Two accounts crossed due today.', figure: 'USD 1,927', fg: L.bad },
+        { label: 'Stock', one: 'Maize meal runs out in 4 days.', figure: '3 low · 1 out', fg: L.warn },
+        { label: 'Team & projects', one: 'Eastleigh refit 45 → 60%.', figure: '12 / 37', fg: L.tx }
+      ],
+      mobileSectionsDark: [
+        { label: 'Sales', one: 'Cooking oil carried the day — USD 412.', figure: '+21.4%', fg: D.good },
+        { label: 'Debts', one: 'Two accounts crossed due today.', figure: 'USD 1,927', fg: D.bad },
+        { label: 'Stock', one: 'Maize meal runs out in 4 days.', figure: '3 low · 1 out', fg: D.warn },
+        { label: 'Team & projects', one: 'Eastleigh refit 45 → 60%.', figure: '12 / 37', fg: D.tx }
+      ],
+      partialPresent: [
+        { label: 'Sales', ok: true }, { label: 'Debts', ok: true }, { label: 'Stock', ok: false }, { label: 'Team', ok: false }, { label: 'Tomorrow', ok: true }
+      ].map(s => ({ label: s.label, icon: this.ic(s.ok ? 'check' : 'minus'), bg: s.ok ? L.goodS : 'transparent', fg: s.ok ? L.good : L.mu, bd: s.ok ? L.goodS : L.base })),
+      skeletons: ['80%', '62%', '70%', '40%'],
+      skelBars: ['40%', '65%', '30%', '80%', '55%', '90%', '70%'],
+      partialActions: mkActions(L).slice(0, 4),
+      notesD: [
+        { k: 'partial', v: 'same page, same weight for what arrived · a single mono "3 of 5 analysts reported" line + a quiet row of section chips (✓ / —) · missing sections render as one 56px muted row each, in their normal position, never a full empty card · verdict pill still shown' },
+        { k: 'failed', v: 'one panel, serif 26 title, one line, retry action + mono request id · no section frames · history and period control still present' },
+        { k: 'no digest yet', v: 'empty state on the page ground, not in a card · says the clock time it will arrive in the shop\u2019s timezone' },
+        { k: 'switched off', v: 'same empty-state shape · one sentence + link to Settings' },
+        { k: 'generating', v: 'stat card skeletons in the content shape · Generate button becomes a 38px progress pill with mono elapsed time · quota decrements immediately' }
+      ],
+      notesC: [
+        { k: 'order', v: 'verdict → two figures → mini chart → Tomorrow (3 of 6, then "Show more") → sections collapsed → history' },
+        { k: 'header', v: '52px bar · back arrow + title 15/500 · Generate 34px' },
+        { k: 'period', v: 'horizontal chip row, 32px, scrolls; selected chip is inverted ink' },
+        { k: 'headline', v: 'serif 24 / 1.25 (one step down from 26)' },
+        { k: 'figures', v: 'two cards only · value mono 20 · delta mono 11' },
+        { k: 'chart', v: '56px tall, labels only, no axis — shape not values' },
+        { k: 'sections', v: 'one card per analyst: label + one sentence + one mono figure · tap expands to the desktop content' }
+      ],
+
+      heroStats: mkStats(L), heroStatsDark: mkStats(D),
+      axis: this.axis(rev, 4),
+      bars: this.bars(rev, days, L.ac, '#EAC7B8', 6),
+      barsDark: this.bars(rev, days, D.ac, '#5A4038', 6),
+      salesPoints: [
+        'Cooking oil 3 L: 46 units, USD 412 \u2014 a quarter of the day.',
+        'Average sale USD 49.90, up from USD 41 last Monday.',
+        'Two sales after 19:00 (USD 96) \u2014 the counter is usually quiet by then.'
+      ],
+      actions: mkActions(L), actionsDark: mkActions(D),
+      chase: [
+        { name: 'Nasra Ali', why: '25 days overdue, no payment ever recorded', amount: 'USD 380.75' },
+        { name: 'Abdirahman K.', why: '9 days overdue, paid half already', amount: 'USD 210.00' },
+        { name: 'Fatuma Yusuf', why: 'Crossed due date today', amount: 'USD 96.50' }
+      ],
+      reorder: [
+        { name: 'Maize meal 10 kg', days: '4 days left', w: '28%', fg: L.bad, bar: L.bad, why: '22 pcs, selling 6 a day' },
+        { name: 'Basmati rice 5 kg', days: '2 days left', w: '15%', fg: L.bad, bar: L.bad, why: '3 pcs, threshold 10' },
+        { name: 'Sugar', days: '9 days left', w: '48%', fg: L.warn, bar: L.warn, why: '7.5 kg, threshold 25' }
+      ],
+      staff: [
+        { name: 'Yusuf Hassan', w: '100%', rev: 'USD 612.00' },
+        { name: 'Amina Mohamed', w: '81%', rev: 'USD 498.50' },
+        { name: 'Sagal Omar', w: '66%', rev: 'USD 402.00' }
+      ],
+      history: mkHistory(L), historyDark: mkHistory(D),
+
+      notesA: [
+        { k: 'page pad', v: '32px · content max 1280 · column gap 20px' },
+        { k: 'title', v: 'Instrument Serif 32 / 1.1 · date line Geist 13 muted' },
+        { k: 'verdict', v: 'pill 24px + mono 11 count · headline serif 26 / 1.25, max 720px' },
+        { k: 'stat card', v: '18px pad · label mono 11 upper +0.08em · value mono 28 / 500 · sparkline 12 bars 4px · footer mono 11 delta + sans 12' },
+        { k: 'actions', v: 'largest block, first column · row 16px pad · priority chip mono 10 upper, tinted, word always visible · text sans 15 / 1.45 · figure mono 12' },
+        { k: 'chart', v: 'bars 6px 6px 0 0, max 56px, gap 12 · 4 grid lines · today in accent, rest accent-soft · axis mono 10' },
+        { k: 'prose', v: 'serif 20 / 1.35, one paragraph per analyst, after its figures' },
+        { k: 'sub-lists', v: 'chase / reorder rows 11px pad · name sans 13 / 500 · why sans 12 muted · amount mono 13' },
+        { k: 'history', v: 'row 48px · date mono 12 · status pill 22px · whole row is the link' },
+        { k: 'period', v: 'segmented 32px · Generate now 38px accent · quota mono 11' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
