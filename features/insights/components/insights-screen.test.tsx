@@ -32,6 +32,13 @@ let profile: {
 
 let canRun = true;
 
+let quota: {
+  limit: number;
+  used: number;
+  remaining: number;
+  resetsAt: string;
+} | null = null;
+
 vi.mock("@/features/insights/hooks/use-digests", () => ({
   useLatestDigest: () => latest,
   useDigests: () => ({
@@ -41,6 +48,21 @@ vi.mock("@/features/insights/hooks/use-digests", () => ({
     refetch: vi.fn(),
   }),
   useRunDigest: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+  useDigestQuota: () => quota,
+  quotaFromRefusal: () => null,
+}));
+
+// The screen reads the shop's main currency for its `unit: "money"` figures.
+// The real hook opens a `useQuery`, which needs a QueryClientProvider this
+// spec has no reason to mount.
+vi.mock("@/features/organization/hooks/use-currency-config", () => ({
+  useCurrencyConfig: () => ({
+    mainCurrency: "ETB",
+    exchangeCurrency: "USD",
+    exchangeRate: 130,
+    hasExchange: true,
+    isLoading: false,
+  }),
 }));
 
 vi.mock("@/features/organization/hooks/use-organization-profile", () => ({
@@ -90,6 +112,7 @@ beforeEach(() => {
   latest = { data: undefined, isPending: false, error: null };
   profile = { isLoading: false, data: undefined };
   canRun = true;
+  quota = null;
 });
 
 describe("InsightsScreen — off, on-but-waiting, and present", () => {
@@ -101,7 +124,7 @@ describe("InsightsScreen — off, on-but-waiting, and present", () => {
 
     render(<InsightsScreen />);
 
-    expect(screen.getByText(/daily digest is off/i)).toBeInTheDocument();
+    expect(screen.getByText(/evening digest is off/i)).toBeInTheDocument();
     // The promise that was simply false: nothing arrives tonight.
     expect(screen.queryByText(/21:00/)).not.toBeInTheDocument();
     expect(screen.queryByText(/tonight/i)).not.toBeInTheDocument();
@@ -124,7 +147,7 @@ describe("InsightsScreen — off, on-but-waiting, and present", () => {
 
     render(<InsightsScreen />);
 
-    expect(screen.getByText(/daily digest is off/i)).toBeInTheDocument();
+    expect(screen.getByText(/evening digest is off/i)).toBeInTheDocument();
     // `/settings` is gated `organization:update` and enforced server-side
     // (`config/routes.ts`), so this link would land on <ForbiddenScreen/>.
     expect(
@@ -140,7 +163,7 @@ describe("InsightsScreen — off, on-but-waiting, and present", () => {
 
     render(<InsightsScreen />);
 
-    expect(screen.getByText(/20:00 tonight/)).toBeInTheDocument();
+    expect(screen.getByText(/arrives at 20:00/)).toBeInTheDocument();
     expect(screen.queryByText(/is off/i)).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /generate/i }),
@@ -167,9 +190,11 @@ describe("InsightsScreen — off, on-but-waiting, and present", () => {
 
     render(<InsightsScreen />);
 
-    expect(screen.getByText("A steady Saturday")).toBeInTheDocument();
+    expect(screen.getAllByText("A steady Saturday").length).toBeGreaterThan(0);
     expect(screen.queryByText(/no digest yet/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/daily digest is off/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/evening digest is off/i),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -249,5 +274,169 @@ describe("InsightsScreen — while the AI settings are still in flight", () => {
     expect(
       screen.getByRole("button", { name: /generate/i }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("InsightsScreen — the header says which window the digest covers", () => {
+  it("prints the range ending on the last day INCLUDED, not on the exclusive `to`", () => {
+    // `period.to` is the instant one calendar day after the last day covered,
+    // so a run over 08–14 September carries local midnight opening the 15th.
+    // A header printing it raw reads "08 – 15 Sep" — plausible, and wrong by
+    // one, on every range on the page.
+    profile = {
+      isLoading: false,
+      data: { ai: { enabled: true, language: "en", hourLocal: 21 } },
+    };
+    latest = {
+      data: {
+        ...digest(),
+        localDate: "2026-09-14",
+        timezone: "Africa/Mogadishu",
+        generatedAt: "2026-09-14T18:02:00.000Z",
+        period: {
+          preset: "last7",
+          from: "2026-09-07T21:00:00.000Z",
+          to: "2026-09-14T21:00:00.000Z",
+        },
+      },
+      isPending: false,
+      error: null,
+    };
+
+    render(<InsightsScreen />);
+
+    expect(
+      screen.getByText(/Last 7 days · 08 – 14 Sep 2026/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/15 Sep/)).toBeNull();
+  });
+
+  it("falls back to the day it was written for a row with no window recorded", () => {
+    // `publicDigest` omits `period` for every row written before 2026-09-15
+    // rather than back-filling "today", so a client cannot tell a guess from a
+    // fact. `formatLocalDate`, not `formatDate`: the latter re-parses a bare
+    // `yyyy-MM-dd` as UTC midnight and prints the day BEFORE for any shop west
+    // of Greenwich, which has shipped three times in this repo.
+    profile = {
+      isLoading: false,
+      data: { ai: { enabled: true, language: "en", hourLocal: 21 } },
+    };
+    latest = { data: digest(), isPending: false, error: null };
+
+    render(<InsightsScreen />);
+
+    expect(screen.getByText(/12 Sep 2026/)).toBeInTheDocument();
+    expect(screen.queryByText(/11 Sep 2026/)).toBeNull();
+  });
+});
+
+describe("InsightsScreen — one Generate control, and the allowance beside it", () => {
+  it("renders exactly one Generate button when there is a digest", () => {
+    // Two would each own their own `pending` state and give-up timer, so one
+    // would sit at "Generate now" while the other said "Generating 0:23" about
+    // the same run — and the allowance line would print twice.
+    profile = {
+      isLoading: false,
+      data: { ai: { enabled: true, language: "en", hourLocal: 21 } },
+    };
+    latest = { data: digest(), isPending: false, error: null };
+    quota = {
+      limit: 2,
+      used: 1,
+      remaining: 1,
+      resetsAt: "2026-09-13T18:00:00.000Z",
+    };
+
+    render(<InsightsScreen />);
+
+    expect(screen.getAllByRole("button", { name: /generate/i })).toHaveLength(
+      1,
+    );
+    expect(screen.getAllByText("1 of 2 left today")).toHaveLength(1);
+  });
+
+  it("renders exactly one on the empty screen too, inside the panel explaining why", () => {
+    profile = {
+      isLoading: false,
+      data: { ai: { enabled: true, language: "en", hourLocal: 21 } },
+    };
+    quota = {
+      limit: 2,
+      used: 0,
+      remaining: 2,
+      resetsAt: "2026-09-13T18:00:00.000Z",
+    };
+
+    render(<InsightsScreen />);
+
+    expect(screen.getAllByRole("button", { name: /generate/i })).toHaveLength(
+      1,
+    );
+    expect(screen.getByText("2 of 2 left today")).toBeInTheDocument();
+  });
+
+  it("shows no allowance at all rather than '0 of 0' when it is unknown", () => {
+    // `GET /digests/quota` 403s for a stale session and 404s against an older
+    // API build. "0 of 0 left today" is indistinguishable from a spent
+    // allowance and would stop an owner who has runs in hand.
+    profile = {
+      isLoading: false,
+      data: { ai: { enabled: true, language: "en", hourLocal: 21 } },
+    };
+    quota = null;
+
+    render(<InsightsScreen />);
+
+    expect(screen.queryByText(/left today/)).toBeNull();
+  });
+});
+
+describe("InsightsScreen — the period control", () => {
+  it("offers the digest vocabulary, which is NOT the reports one", () => {
+    // `today | last7 | last30 | last90 | year | custom`. The reports endpoints
+    // take `today | week | month | year`, and the two disagree about what they
+    // mean: "last 7 days" is a rolling window ending today where "week" is the
+    // calendar week from Monday. Reusing the reports control here would
+    // silently relabel one as the other.
+    profile = {
+      isLoading: false,
+      data: { ai: { enabled: true, language: "en", hourLocal: 21 } },
+    };
+
+    render(<InsightsScreen />);
+
+    const group = screen.getByRole("group", {
+      name: /period for the next digest/i,
+    });
+    expect(group).toBeInTheDocument();
+    for (const label of [
+      "Today",
+      "Last 7 days",
+      "Last 30 days",
+      "Last 90 days",
+      "This year",
+      "Custom",
+    ]) {
+      expect(screen.getByRole("radio", { name: label })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole("radio", { name: "This week" })).toBeNull();
+    expect(screen.queryByRole("radio", { name: "This month" })).toBeNull();
+  });
+
+  it("is not offered at all to a viewer who cannot spend a run", () => {
+    // A control whose only purpose is to parameterise an action this viewer
+    // may never take is noise. The allowance line still shows, because reading
+    // it is `reports:view`.
+    canRun = false;
+    profile = {
+      isLoading: false,
+      data: { ai: { enabled: true, language: "en", hourLocal: 21 } },
+    };
+
+    render(<InsightsScreen />);
+
+    expect(
+      screen.queryByRole("group", { name: /period for the next digest/i }),
+    ).toBeNull();
   });
 });

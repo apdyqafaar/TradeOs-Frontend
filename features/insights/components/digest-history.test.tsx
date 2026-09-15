@@ -145,3 +145,49 @@ describe("DigestHistory — each row is stamped in its own timezone", () => {
     expect(row).toHaveAttribute("title", "12 Sep 2026 22:06");
   });
 });
+
+describe("DigestHistory — the whole row opens the digest", () => {
+  it("is one link, not a date-only link beside four dead columns", () => {
+    // The build note asks for the whole row; the failure mode it prevents is a
+    // `div` with an `onClick`, which this codebase has already shipped 24
+    // times as a link announced and keyed as a button.
+    query = {
+      data: {
+        items: [
+          {
+            ...summary(),
+            period: {
+              preset: "last7",
+              from: "2026-09-06T21:00:00.000Z",
+              to: "2026-09-13T21:00:00.000Z",
+            },
+          },
+        ],
+        meta: { page: 1, totalPages: 1 },
+      },
+      error: null,
+      isPending: false,
+    };
+
+    render(<DigestHistory />);
+
+    const row = screen.getByRole("link", { name: /12 Sep 2026/ });
+    expect(row).toHaveAttribute("href", "/insights/d1");
+    expect(row).toHaveTextContent("A steady Saturday");
+    expect(row).toHaveTextContent("Complete");
+    // The window it covers, which is no longer the day it was written on.
+    expect(row).toHaveTextContent("Last 7 days");
+  });
+
+  it("says nothing about a window for a row written before the field existed", () => {
+    query = {
+      data: { items: [summary()], meta: { page: 1, totalPages: 1 } },
+      error: null,
+      isPending: false,
+    };
+
+    render(<DigestHistory />);
+
+    expect(screen.queryByText(/Last 7 days/)).toBeNull();
+  });
+});

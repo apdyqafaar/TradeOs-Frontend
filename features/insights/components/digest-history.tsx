@@ -11,35 +11,36 @@ import { ROUTES } from "@/config/routes";
 import { SectionStrip } from "@/features/dashboard/components/section-strip";
 import { DigestStatusBadge } from "@/features/insights/components/digest-status";
 import { useDigests } from "@/features/insights/hooks/use-digests";
+import { headlineOf } from "@/features/insights/lib/digest-shape";
+import { DIGEST_PERIOD_LABELS } from "@/features/insights/lib/period";
 import type { DigestSummary } from "@/features/insights/types";
 import { formatDateTime, formatLocalDate } from "@/lib/format/date";
 
 const PAGE_SIZE = 10;
 const SKELETON_ROWS = 3;
 
-/** The first headline a member would actually read, whichever section wrote one. */
-function headlineOf(summary: DigestSummary): string {
-  return (
-    summary.sections.sales?.headline ??
-    summary.sections.debts?.headline ??
-    summary.sections.stock?.headline ??
-    summary.sections.team?.headline ??
-    "This run did not finish writing anything."
-  );
-}
-
 /**
- * Every digest that has ever run, newest first — the record `/insights`
- * itself only shows the latest one of.
+ * Every digest that has ever run, newest first — the record `/insights` itself
+ * only shows the latest one of.
+ *
+ * **The whole row is one link**, as the build note asks, rather than a link on
+ * the date with four unclickable columns beside it. It is a real `<a>`: this
+ * codebase shipped 24 links announced and keyed as buttons, caught only in a
+ * browser, and a row is exactly the shape that tempts a `div` with an
+ * `onClick`.
  *
  * No `timezone` prop: each row's exact-instant tooltip is rendered in
- * `item.timezone`, the zone THAT digest was written in
- * (`Backend/src/db/models/digest.model.ts:32`), not the organization's current
- * one. Correcting a wrong timezone in Settings used to move every historical
- * row's tooltip, so a digest stamped 21:00 on the 12th showed as "13 Sep 2026
- * 00:00" beside a `localDate` column reading "12 Sep 2026" — the same row
- * contradicting itself. Dropping the parameter makes reaching for the wrong
- * zone a compile error, as `insights-section.tsx` already does for dates.
+ * `item.timezone`, the zone THAT digest was written in, not the organization's
+ * current one. Correcting a wrong timezone in Settings used to move every
+ * historical row's tooltip, so a digest stamped 21:00 on the 12th showed as
+ * "13 Sep 2026 00:00" beside a `localDate` column reading "12 Sep 2026" — the
+ * same row contradicting itself. Dropping the parameter makes reaching for the
+ * wrong zone a compile error.
+ *
+ * `formatLocalDate`, never `formatDate`: `localDate` is a bare `yyyy-MM-dd` the
+ * server already resolved in the shop's zone, and routing it through
+ * `formatDate` prints the day *before* for any shop west of Greenwich. That
+ * mistake has shipped three times in this repo.
  */
 export function DigestHistory() {
   const [page, setPage] = useState(1);
@@ -50,7 +51,7 @@ export function DigestHistory() {
 
   return (
     <SectionStrip
-      title="History"
+      title="Earlier digests"
       info="Every digest that has run, newest first."
     >
       {error ? (
@@ -63,8 +64,7 @@ export function DigestHistory() {
             // ask again and be refused identically every time. The reachable
             // path is an Owner removing `reports:view` mid-session: the
             // cached `latest` above stays on screen, and pressing **Older**
-            // is a new query key and the first thing to be refused. Same
-            // rule as `previous-jobs.tsx` and `ErrorCard`'s own docblock.
+            // is a new query key and the first thing to be refused.
             retry={
               error.status === 403
                 ? undefined
@@ -81,8 +81,7 @@ export function DigestHistory() {
         empty list under it would read as "no earlier digests" rather than
         "we could not ask". A failure *over* existing rows keeps them — a
         background refetch that 500s should not blank a list the reader was
-        already looking at (same convention as `customers-page.tsx` /
-        `products-page.tsx`).
+        already looking at.
       */}
       {error && !data ? null : isPending ? (
         <div className="flex flex-col gap-2 p-[18px]">
@@ -101,23 +100,13 @@ export function DigestHistory() {
           }
         />
       ) : (
-        <ul className="flex flex-col px-[18px] pt-1.5 pb-3">
+        <ul className="flex flex-col">
           {items.map((item) => (
             <li
               key={item.id}
-              className="flex items-center gap-3 border-border/60 border-b py-2.5 last:border-b-0"
+              className="border-border/60 border-b last:border-b-0"
             >
-              <Link
-                href={ROUTES.insight(item.id)}
-                title={formatDateTime(item.createdAt, item.timezone)}
-                className="w-[110px] flex-none rounded-sm font-mono text-[12px] text-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                {formatLocalDate(item.localDate)}
-              </Link>
-              <DigestStatusBadge status={item.status} />
-              <span className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground">
-                {headlineOf(item)}
-              </span>
+              <HistoryRow item={item} />
             </li>
           ))}
         </ul>
@@ -154,5 +143,36 @@ export function DigestHistory() {
         </nav>
       ) : null}
     </SectionStrip>
+  );
+}
+
+function HistoryRow({ item }: { item: DigestSummary }) {
+  const headline = headlineOf(item);
+
+  return (
+    <Link
+      href={ROUTES.insight(item.id)}
+      title={formatDateTime(item.createdAt, item.timezone)}
+      className="grid min-h-[48px] grid-cols-[auto_1fr_auto] items-center gap-x-3.5 gap-y-1 px-[18px] py-2.5 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 lg:grid-cols-[110px_90px_1fr_auto_16px]"
+    >
+      <span className="font-mono text-[12px] text-foreground">
+        {formatLocalDate(item.localDate)}
+      </span>
+      {/* The window the digest is ABOUT, which is no longer the day it was
+          written on. Absent for every row written before the field existed —
+          `publicDigest` omits the key rather than back-filling "Today", so
+          this does too. */}
+      <span className="text-[12px] text-muted-foreground max-lg:hidden">
+        {item.period ? DIGEST_PERIOD_LABELS[item.period.preset] : ""}
+      </span>
+      <span className="col-span-full min-w-0 truncate text-[13px] text-foreground lg:col-span-1">
+        {headline ?? "This run did not finish writing anything."}
+      </span>
+      <DigestStatusBadge status={item.status} className="justify-self-start" />
+      <ChevronRight
+        className="size-4 text-muted-3 max-lg:hidden"
+        aria-hidden="true"
+      />
+    </Link>
   );
 }
