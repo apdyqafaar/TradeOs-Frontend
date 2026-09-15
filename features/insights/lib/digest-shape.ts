@@ -53,28 +53,105 @@ export const SECTION_CHIP_LABELS: Record<SectionKey, string> = {
 };
 
 /**
- * How many of the five wrote something.
- *
- * **Not a backend field.** Nothing on the wire counts this; it is the count of
- * non-null sections and it is computed here, which is why it is one exported
- * function rather than an inline `Object.values(...).filter(Boolean).length`
- * in whichever component needed it first. A run that stopped on budget after
- * three submissions and a run that lost two analysts to parse errors are the
- * same "3 of 5" to a reader, and both are honest.
+ * The analyst's name as it reads inside a sentence — "team", not "Team &
+ * projects".
  */
-export function analystsReported(sections: DigestSections): number {
-  return SECTION_ORDER.filter((key) => sections[key] !== null).length;
+export const SECTION_SUBJECTS: Record<SectionKey, string> = {
+  sales: "sales",
+  debts: "debts",
+  stock: "stock",
+  team: "team",
+  recommendations: "advisor",
+};
+
+/**
+ * What a quiet section says, in the owner's words.
+ *
+ * **Never "skipped".** That is our internal word for it and it sounds like a
+ * failure; what actually happened is that the shop had a quiet day in that
+ * one subject, which is ordinary and frequent for a small shop. The copy names
+ * the absence of the ACTIVITY, not the absence of the analyst, and carries no
+ * warning tone at all — nothing went wrong.
+ */
+export const SECTION_QUIET_COPY: Record<SectionKey, string> = {
+  sales: "No sales were recorded in this period.",
+  debts: "No debts were owed, paid or fell due in this period.",
+  stock: "No stock moved in this period.",
+  team: "No staff sales or project updates in this period.",
+  recommendations: "Nothing came up that needs doing tomorrow.",
+};
+
+/**
+ * The three states one section can be in.
+ *
+ * A boolean cannot hold this, which is the point: "the analyst did not finish"
+ * and "there was nothing for the analyst to read" are opposite news that both
+ * arrive as a `null` section, and only one of them is a shortfall. Everything
+ * on the screen — the chips, the count, the stand-in card, the actions tail —
+ * reads this one value rather than re-deciding it, so the two can never be
+ * rendered inconsistently on the same page.
+ */
+export type SectionState =
+  | { kind: "delivered" }
+  /** Dispatched and could not finish. The canvas's minus-icon rows describe this. */
+  | { kind: "failed"; reason?: string }
+  /** Never dispatched: the shop had no activity of that kind. Not an error. */
+  | { kind: "quiet" };
+
+/**
+ * **The one place the wire is read into a section state.**
+ *
+ * The backend field that marks a quiet section is `skipped` on the digest row
+ * and **its name is not final** — it is being decided as this ships. That is
+ * why the mapping lives in exactly one function: when it changes, this is the
+ * line, plus its declaration in `features/insights/types.ts`. Nothing else in
+ * the feature touches `digest.skipped`, and nothing else compares a section to
+ * `null`.
+ *
+ * Order matters. A section that arrived is `delivered` whatever any other
+ * field says — a row that is both present and listed as quiet is a backend
+ * inconsistency, and rendering the content we actually have is the honest
+ * resolution of it.
+ */
+export function readSectionState(
+  digest: Pick<DigestSummary, "sections" | "errors" | "skipped">,
+  key: SectionKey,
+): SectionState {
+  if (digest.sections[key] !== null) return { kind: "delivered" };
+  if (digest.skipped?.includes(key)) return { kind: "quiet" };
+  return {
+    kind: "failed",
+    reason: digest.errors.find((entry) => entry.section === key)?.message,
+  };
 }
 
-/** Which of the five arrived, in reading order — the chips on a partial run. */
-export function sectionPresence(
-  sections: DigestSections,
-): { key: SectionKey; label: string; present: boolean }[] {
+/** All five states at once, in reading order. */
+export function sectionStates(
+  digest: Pick<DigestSummary, "sections" | "errors" | "skipped">,
+): { key: SectionKey; label: string; state: SectionState }[] {
   return SECTION_ORDER.map((key) => ({
     key,
     label: SECTION_CHIP_LABELS[key],
-    present: sections[key] !== null,
+    state: readSectionState(digest, key),
   }));
+}
+
+/**
+ * How many of the five reported.
+ *
+ * **Not a backend field**, and **a quiet section counts as reported.** The
+ * analyst answered the question it was asked; the answer was "nothing
+ * happened", which is a complete report. Counting it as a shortfall would put
+ * "3 of 5 analysts reported" at the top of an ordinary quiet Sunday and make a
+ * working product look broken — the single most common day a small shop has.
+ *
+ * Only `failed` is missing from the count.
+ */
+export function analystsReported(
+  digest: Pick<DigestSummary, "sections" | "errors" | "skipped">,
+): number {
+  return sectionStates(digest).filter((entry) => entry.state.kind !== "failed")
+    .length;
 }
 
 /** One number for the top of the page, and the series it was drawn from. */
@@ -169,11 +246,15 @@ export function headlineOf(digest: DigestSummary): string | null {
  * "6 actions · 2 high", and on a partial run the honest tail the canvas draws:
  * "· no stock actions tonight".
  *
- * The tail names the *missing analysts*, not the missing actions. An advisor
- * that finished can only recommend restocking if the stock analyst reported,
- * so an actions list with no restock on it is ambiguous — it means either "the
- * shelves are fine" or "nobody looked". Saying which is the difference between
- * a reader trusting the list and a reader being misled by it.
+ * The tail names the analysts that **failed**, not every analyst with no
+ * section. An advisor that finished can only recommend restocking if the stock
+ * analyst reported, so a list with no restock on it is ambiguous — it means
+ * either "the shelves are fine" or "nobody looked", and only the reader being
+ * told which can trust the list.
+ *
+ * A **quiet** analyst is deliberately not in the tail. Nothing went wrong and
+ * nothing was missed: there was no stock movement to act on, so "no stock
+ * actions tonight" would be true but would read as the shortfall it is not.
  */
 export function actionsSummary(digest: Digest): string {
   const actions = digest.sections.recommendations?.actions ?? [];
@@ -183,11 +264,11 @@ export function actionsSummary(digest: Digest): string {
     `${high} high`,
   ];
 
-  const missing = (["sales", "debts", "stock", "team"] as const).filter(
-    (key) => digest.sections[key] === null,
+  const failed = (["sales", "debts", "stock", "team"] as const).filter(
+    (key) => readSectionState(digest, key).kind === "failed",
   );
-  if (missing.length > 0) {
-    parts.push(`no ${missing.join(" or ")} actions tonight`);
+  if (failed.length > 0) {
+    parts.push(`no ${failed.join(" or ")} actions tonight`);
   }
 
   return parts.join(" · ");

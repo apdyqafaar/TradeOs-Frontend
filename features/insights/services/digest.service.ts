@@ -2,6 +2,7 @@ import type {
   Digest,
   DigestQuota,
   DigestSummary,
+  RunDigestInput,
   RunDigestResult,
 } from "@/features/insights/types";
 import { apiGet, apiGetList, apiPost } from "@/lib/api/client";
@@ -40,22 +41,51 @@ export const listDigests = (params: {
 }): Promise<Paginated<DigestSummary>> =>
   apiGetList<DigestSummary>(BASE, { params });
 
-/** `POST /digests/run` — `organization:update`. 202 — the digest lands about a minute later; callers poll `getLatestDigest`. */
-export const runDigest = (): Promise<RunDigestResult> =>
-  apiPost<RunDigestResult>(`${BASE}/run`, {});
+/**
+ * `POST /digests/run` — `organization:update`. 202; the digest lands about a
+ * minute later and callers poll `getLatestDigest`.
+ *
+ * The body is new: a `preset` from `DIGEST_PERIOD_PRESETS`, plus `from`/`to`
+ * for `custom` only. `runDigestBodySchema` is `.strict()` and refuses a range
+ * sent with any other preset rather than dropping it — so a period sent by
+ * mistake is a 422, not a digest over a window nobody asked for. Sending `{}`
+ * is still valid and still means today, which is why the parameter is
+ * optional.
+ *
+ * The 202 carries `{ localDate, period, quota }`: the allowance comes back
+ * inline, so nothing needs to refetch `GET /digests/quota` afterwards.
+ */
+export const runDigest = (
+  input: RunDigestInput = {},
+): Promise<RunDigestResult> =>
+  apiPost<RunDigestResult>(`${BASE}/run`, {
+    /**
+     * **The wire field is `period`, and it holds the PRESET STRING** —
+     * `runDigestBodySchema` is `period: z.enum(DIGEST_PERIOD_PRESETS)`, and the
+     * controller renames it to `preset` on its way into the service. The 202
+     * comes back with a `period` that is an *object* (`{preset, from, to}`), so
+     * the one name means two different shapes in the two directions.
+     *
+     * This is the only place that asymmetry exists. The app-side type calls the
+     * request field `preset`, matching the resolved object's own key, and the
+     * mapping happens here where the schema is quoted beside it. Sending
+     * `{ preset }` instead would be silently dropped by `.strict()` — no, worse
+     * than dropped: `.strict()` makes it a 422, which is at least loud.
+     */
+    ...(input.preset ? { period: input.preset } : {}),
+    ...(input.from ? { from: input.from } : {}),
+    ...(input.to ? { to: input.to } : {}),
+  });
 
 /**
  * `GET /digests/quota` — the manual-run allowance, answered **even when the
  * shop has no digest at all**, which is why it is its own request rather than
- * a field on `latest`: the empty screen is exactly where "3 of 3 left today"
+ * a field on `latest`: the empty screen is exactly where "2 of 2 left today"
  * belongs.
  *
- * **Not in `docs/API-ROUTES.md` and not in the backend router as of
- * 2026-09-15.** Everything else in this file was checked against that table
- * first, per CLAUDE.md; this one is written against the rebuild brief's
- * forecast of a contract still being built. `useDigestQuota` therefore treats
- * every failure as "do not render the line", so a frontend deployed ahead of
- * the API shows no quota rather than an error.
+ * Gated `reports:view`, not `organization:update` — reading how many runs are
+ * left is not spending one, and every artboard renders the count including for
+ * a viewer who can never press Generate.
  */
 export const getDigestQuota = (): Promise<DigestQuota> =>
   apiGet<DigestQuota>(`${BASE}/quota`);

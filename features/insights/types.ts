@@ -9,6 +9,57 @@ import type { AiLanguage } from "@/features/organization/types";
 
 export type DigestStatus = "complete" | "partial" | "failed";
 export type StoppedBy = "complete" | "budget" | "hops" | "error";
+
+/**
+ * The six windows a manual run can ask for — `DIGEST_PERIOD_PRESETS` in
+ * `Backend/src/lib/digest-period.ts`, verbatim.
+ *
+ * **This is not the reports vocabulary and must never be merged with it.**
+ * `periodQueryFields` on every `/reports/*` endpoint is `today | week | month |
+ * year`, and the two disagree about what they mean: `last7` is a rolling seven
+ * days ending today, where `week` is the calendar week from Monday. Reusing the
+ * reports period type or its control here would silently relabel one as the
+ * other.
+ */
+export const DIGEST_PERIOD_PRESETS = [
+  "today",
+  "last7",
+  "last30",
+  "last90",
+  "year",
+  "custom",
+] as const;
+export type DigestPeriodPreset = (typeof DIGEST_PERIOD_PRESETS)[number];
+
+/**
+ * The window a digest actually covers, resolved server-side in the shop's own
+ * timezone and stored on the row so the label cannot drift.
+ *
+ * **`to` is EXCLUSIVE** — the instant one calendar day after the last day
+ * included, like every other `to` in this API. A digest of 08–14 September
+ * carries `to` = local midnight opening the **15th**, so printing it directly
+ * is off by one on every range on the page. `formatDigestPeriod` in
+ * `lib/period.ts` is the single place that subtracts the day.
+ *
+ * Optional on a digest: rows written before 2026-09-15 have no period at all,
+ * and `publicDigest` omits the key rather than inventing `today` for them.
+ */
+export interface DigestPeriod {
+  preset: DigestPeriodPreset;
+  /** ISO 8601 instant. Inclusive. */
+  from: string;
+  /** ISO 8601 instant. **Exclusive.** */
+  to: string;
+}
+
+/** What `POST /digests/run` accepts. `from`/`to` only with `preset: "custom"`. */
+export interface RunDigestInput {
+  preset?: DigestPeriodPreset;
+  /** Bare `yyyy-MM-dd`, inclusive. Refused unless the preset is `custom`. */
+  from?: string;
+  /** Bare `yyyy-MM-dd`, inclusive. Refused unless the preset is `custom`. */
+  to?: string;
+}
 export type SectionKey =
   | "sales"
   | "debts"
@@ -26,12 +77,8 @@ export type SectionKey =
  * `lib/format/money.ts` with the code from `useCurrencyConfig()`, never a
  * symbol: this market mixes currencies whose symbols collide.
  *
- * `"days"` is in the rebuild brief's forecast of the contract but **not** in
- * the backend's own plan for it
- * (`Backend/docs/superpowers/plans/2026-09-15-digest-cost-and-presentation.md`
- * §5, which enumerates `money | count | percent`). Accepting the wider set
- * costs nothing and means a `days` figure renders rather than crashing a
- * `Record` lookup if the wider one is what ships.
+ * All four are live — `figureSchema` in `Backend/src/services/ai/schemas.ts`
+ * (`d0042ad`) — and the debts analyst uses `"days"`.
  */
 export type FigureUnit = "money" | "count" | "percent" | "days";
 
@@ -46,11 +93,10 @@ export type FigureTone = "neutral" | "good" | "warn" | "bad";
  * One number an analyst picked out of its own tool results. At most four per
  * section.
  *
- * **Every field but `label`, `value` and `unit` is optional, and the whole
- * array is optional on every section**, because as of 2026-09-15 the API sends
- * none of it: `Backend/src/services/ai/schemas.ts` still describes the five
- * sections as prose only. Task D of the backend plan adds it. Typing it as
- * required would make `tsc` agree with a page that renders `undefined.map`.
+ * **`direction`, `deltaPct` and `tone` are each optional on the wire**, and an
+ * absent `tone` is `neutral` — never a tone derived from the label, and never
+ * from the sign of `deltaPct`. Only the analyst that read the day knows whether
+ * a given number is bad news for this shop.
  */
 export interface SectionFigure {
   label: string;
@@ -70,7 +116,14 @@ export interface SectionFigure {
   tone?: FigureTone;
 }
 
-/** One bucket of a small trailing series: at most 12, oldest first. */
+/**
+ * One bucket of a small trailing series.
+ *
+ * **Oldest first**, at most 12. The bar chart and the sparklines both render
+ * left to right in exactly that order — never reversed here, never re-sorted:
+ * the labels are the model's own short axis strings ("MON", "08 Sep") and
+ * sorting them as text would scramble a week.
+ */
 export interface SeriesPoint {
   label: string;
   value: number;
@@ -80,14 +133,26 @@ export interface SeriesPoint {
  * The structured half of a section: the numbers a chart or a stat card can be
  * drawn from, beside the prose an owner actually reads.
  *
- * Optional for the reason `SectionFigure` gives — nothing on the wire carries
- * them yet — so every consumer must handle their absence, and the page degrades
- * to prose rather than breaking.
+ * **Three different "no numbers" cases reach this type, and all three must
+ * render as "nothing to draw" rather than crash:**
+ *
+ *  1. `figures: []` — required on the wire but legitimately empty. A day with
+ *     nothing in it is a real answer, not missing data.
+ *  2. `series` absent — optional on the wire and frequently omitted; the model
+ *     is told to leave it out when there is nothing worth plotting.
+ *  3. **`figures` absent entirely** — `sections` is a Mongoose `Mixed` field
+ *     and no migration was run, so every row written before 2026-09-15 has no
+ *     `figures` key at all. That includes the only digest this shop actually
+ *     has, which is therefore the first row its owner will open.
+ *
+ * Case 3 is why `figures` is optional here while the zod schema requires it:
+ * typing it as required would make `tsc` agree with a page that calls
+ * `undefined.map` on the one row that exists.
  */
 interface SectionNumbers {
-  /** At most 4. */
+  /** 0..4. Absent on rows written before the field existed — see above. */
   figures?: SectionFigure[];
-  /** At most 12, oldest first. */
+  /** 0..12, oldest first. Optional on the wire and often omitted. */
   series?: SeriesPoint[];
 }
 
@@ -129,9 +194,14 @@ export type DigestVerdict = "good" | "mixed" | "poor" | "quiet";
 export interface RecommendationsSection extends SectionNumbers {
   actions: RecommendationAction[];
   warnings: string[];
-  /** Absent until the backend's Task D lands — see `SectionFigure`. */
+  /**
+   * Required by the shipped schema and **still optional here**: rows written
+   * before 2026-09-15 carry neither, for the no-migration reason
+   * `SectionNumbers` gives. `verdictOf` returns null for those and the page
+   * falls back to the run's `status` pill.
+   */
   verdict?: DigestVerdict;
-  /** The one serif line at the top of the page. Absent for the same reason. */
+  /** The one serif 26px line at the top of the page. Absent for the same reason. */
   summary?: string;
 }
 export interface DigestSections {
@@ -155,7 +225,14 @@ export interface ToolTrace {
 
 export interface DigestSummary {
   id: string;
+  /** The shop-local day the digest was WRITTEN on, and the row's identity. */
   localDate: string;
+  /**
+   * The window it is ABOUT, which is no longer the same thing: a row stamped
+   * "14 September" can legitimately summarise 08–14 September. Absent on rows
+   * written before the field existed.
+   */
+  period?: DigestPeriod;
   timezone: string;
   language: AiLanguage;
   model: string;
@@ -178,6 +255,22 @@ export interface DigestSummary {
    */
   failureMode?: "systematic" | "transient";
   sections: DigestSections;
+  /**
+   * Sections whose analyst was **never dispatched**, because the shop had no
+   * activity of that kind in the period. A quiet day, not a failure — the
+   * third state a section can be in, beside "delivered" and "did not finish".
+   *
+   * **THE FIELD NAME IS NOT FINAL.** The backend task landing this is choosing
+   * it as this ships. `readSectionState` in `lib/digest-shape.ts` is the only
+   * code that reads it, and this line is the only place it is typed, so
+   * renaming it is two edits and no hunting.
+   *
+   * A small shop has quiet days constantly, which is why this cannot be folded
+   * into `null`: "the stock analyst did not finish tonight" printed on a day
+   * when no stock moved is a lie the owner has no way to detect, and it makes
+   * a working product look broken every quiet day for ever.
+   */
+  skipped?: SectionKey[];
   errors: { section: SectionKey; message: string }[];
   usage: {
     inputTokens: number;
@@ -200,25 +293,41 @@ export interface Digest extends DigestSummary {
    */
   traceDropped?: number;
 }
+/**
+ * The 202 from `POST /digests/run`.
+ *
+ * It carries the **new quota inline**, so the header count updates from the
+ * mutation's own answer and no refetch of `GET /digests/quota` is needed. The
+ * 429 refusal carries the same four fields in `details`, so the count is right
+ * whether the run was accepted or refused.
+ */
 export interface RunDigestResult {
   localDate: string;
+  period: DigestPeriod;
+  quota: DigestQuota;
 }
 
 /**
- * `GET /digests/quota` — how many manual runs are left today.
+ * `GET /digests/quota` — how many manual runs are left today. Gated
+ * `reports:view`, **not** `organization:update`: every artboard renders the
+ * count, including for a viewer who can never press Generate.
  *
- * **This endpoint does not exist yet.** `Backend/src/routes/v1/digest.route.ts`
- * has four `/digests` rows and no quota among them; the three-a-day cap is
- * enforced by a `rateLimit` middleware that answers 429 after the fact and
- * publishes nothing a screen can read before the click. The rebuild brief says
- * a backend task is adding it, so the service and hook are here and the screen
- * renders the line only when it arrives — a 404 is silence, not an error card.
+ * It answers even when the shop has no digest at all, which is why it is its
+ * own request rather than a field on `latest` — the empty screen is exactly
+ * where "2 of 2 left today" belongs.
  */
 export interface DigestQuota {
-  /** Manual runs allowed per day. 3 today (`runLimiter`'s `max`). */
+  /**
+   * Manual runs allowed per shop per day — `AI_MANUAL_RUNS_PER_DAY`, which
+   * **defaults to 2, not 3**. The canvas's "2 of 3 left today" was drawn
+   * against the old in-memory limiter. Always render the string from `limit`
+   * and `remaining`; a literal here is wrong on the shipped default and wrong
+   * again for any deployment that tunes it.
+   */
   limit: number;
   used: number;
+  /** Clamped at 0 server-side, so lowering the limit mid-day never renders negative. */
   remaining: number;
-  /** ISO 8601 instant the window rolls over. */
+  /** ISO 8601 instant of the shop's next local midnight, when `used` returns to 0. */
   resetsAt: string;
 }

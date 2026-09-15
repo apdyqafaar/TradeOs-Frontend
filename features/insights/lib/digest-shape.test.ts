@@ -5,7 +5,8 @@ import {
   analystsReported,
   headlineOf,
   heroFigures,
-  sectionPresence,
+  readSectionState,
+  sectionStates,
   summaryOf,
   verdictOf,
 } from "@/features/insights/lib/digest-shape";
@@ -61,6 +62,57 @@ const digest = (partial: Partial<Digest> = {}): Digest => ({
   ...partial,
 });
 
+describe("a section has three states, not two", () => {
+  it("is delivered when the analyst wrote it", () => {
+    expect(
+      readSectionState(
+        digest({ sections: sections({ sales: sales() }) }),
+        "sales",
+      ),
+    ).toEqual({ kind: "delivered" });
+  });
+
+  it("is failed — with the backend's own reason — when it is absent and not quiet", () => {
+    expect(
+      readSectionState(
+        digest({
+          errors: [
+            {
+              section: "stock",
+              message: "not submitted before the run stopped",
+            },
+          ],
+        }),
+        "stock",
+      ),
+    ).toEqual({
+      kind: "failed",
+      reason: "not submitted before the run stopped",
+    });
+  });
+
+  it("is quiet — never 'did not finish' — when the analyst was never dispatched", () => {
+    // A small shop has quiet days constantly. "The stock analyst did not
+    // finish tonight" printed on a day when no stock moved is a lie the owner
+    // cannot detect, and it makes a working product look broken every quiet
+    // day for ever.
+    expect(readSectionState(digest({ skipped: ["stock"] }), "stock")).toEqual({
+      kind: "quiet",
+    });
+  });
+
+  it("prefers the content it actually has over any other field", () => {
+    // A row both present and listed as quiet is a backend inconsistency.
+    // Rendering the section we were sent is the honest resolution of it.
+    expect(
+      readSectionState(
+        digest({ sections: sections({ sales: sales() }), skipped: ["sales"] }),
+        "sales",
+      ),
+    ).toEqual({ kind: "delivered" });
+  });
+});
+
 describe("analystsReported", () => {
   it("counts the advisor as one of the five", () => {
     // The network runs four analysts plus an advisor (`AGENT_NAMES` in
@@ -71,12 +123,33 @@ describe("analystsReported", () => {
     expect(ANALYST_COUNT).toBe(5);
     expect(
       analystsReported(
-        sections({
-          sales: sales(),
-          debts: { headline: "", points: [], accountsToChase: [] },
-          stock: { headline: "", points: [], reorder: [] },
-          team: { headline: "", people: [], projects: [] },
-          recommendations: advice(),
+        digest({
+          sections: sections({
+            sales: sales(),
+            debts: { headline: "", points: [], accountsToChase: [] },
+            stock: { headline: "", points: [], reorder: [] },
+            team: { headline: "", people: [], projects: [] },
+            recommendations: advice(),
+          }),
+        }),
+      ),
+    ).toBe(5);
+  });
+
+  it("counts a QUIET analyst as having reported — a quiet day is not a shortfall", () => {
+    // The answer to "what happened in stock today?" was "nothing", and that is
+    // a complete report. Counting it as a shortfall would put "4 of 5 analysts
+    // reported" at the top of an ordinary quiet Sunday.
+    expect(
+      analystsReported(
+        digest({
+          sections: sections({
+            sales: sales(),
+            debts: { headline: "", points: [], accountsToChase: [] },
+            team: { headline: "", people: [], projects: [] },
+            recommendations: advice(),
+          }),
+          skipped: ["stock"],
         }),
       ),
     ).toBe(5);
@@ -85,23 +158,32 @@ describe("analystsReported", () => {
   it("counts what arrived on a partial run, and does not round it up", () => {
     expect(
       analystsReported(
-        sections({ sales: sales(), debts: null, recommendations: advice() }),
+        digest({
+          sections: sections({
+            sales: sales(),
+            debts: null,
+            recommendations: advice(),
+          }),
+        }),
       ),
     ).toBe(2);
   });
 
   it("is 0 on a failed run rather than undefined", () => {
-    expect(analystsReported(sections())).toBe(0);
+    expect(analystsReported(digest())).toBe(0);
   });
 });
 
-describe("sectionPresence", () => {
-  it("lists all five in reading order, marking the ones that did not run", () => {
+describe("sectionStates", () => {
+  it("lists all five in reading order, each with its own three-way state", () => {
     // The partial artboard's row of chips. A section that did not finish stays
-    // ON the list with a "—" rather than disappearing from it: dropping it
-    // would make a partial run look like a complete one with fewer subjects.
-    const chips = sectionPresence(
-      sections({ sales: sales(), debts: null, recommendations: advice() }),
+    // ON the list rather than disappearing from it: dropping it would make a
+    // partial run look like a complete one with fewer subjects.
+    const chips = sectionStates(
+      digest({
+        sections: sections({ sales: sales(), recommendations: advice() }),
+        skipped: ["stock"],
+      }),
     );
 
     expect(chips.map((chip) => chip.key)).toEqual([
@@ -111,9 +193,13 @@ describe("sectionPresence", () => {
       "team",
       "recommendations",
     ]);
-    expect(
-      chips.filter((chip) => chip.present).map((chip) => chip.label),
-    ).toEqual(["Sales", "Tomorrow"]);
+    expect(chips.map((chip) => chip.state.kind)).toEqual([
+      "delivered",
+      "failed",
+      "quiet",
+      "failed",
+      "delivered",
+    ]);
   });
 });
 
@@ -305,5 +391,80 @@ describe("actionsSummary", () => {
         }),
       ),
     ).toBe("1 action · 0 high");
+  });
+});
+
+describe("actionsSummary — the tail names failures, never quiet subjects", () => {
+  it("leaves a quiet analyst out of the tail", () => {
+    // Nothing went wrong and nothing was missed: there was no stock movement
+    // to act on. "No stock actions tonight" would be true and would still read
+    // as the shortfall it is not.
+    expect(
+      actionsSummary(
+        digest({
+          sections: sections({
+            sales: sales(),
+            debts: { headline: "", points: [], accountsToChase: [] },
+            team: { headline: "", people: [], projects: [] },
+            recommendations: advice({
+              actions: [{ priority: "high", kind: "chase", text: "a" }],
+            }),
+          }),
+          skipped: ["stock"],
+        }),
+      ),
+    ).toBe("1 action · 1 high");
+  });
+});
+
+describe("the three ways a section can carry no numbers", () => {
+  const withFigures = (figures: SalesSection["figures"]) =>
+    sections({ sales: sales({ figures }) });
+
+  it("survives `figures: []` — a required field that is legitimately empty", () => {
+    // "Nothing in it" is a real answer on a quiet day, not missing data.
+    expect(heroFigures(withFigures([]))).toEqual([]);
+  });
+
+  it("survives `figures` absent entirely, which is EVERY row written before 2026-09-15", () => {
+    // `sections` is a Mongoose `Mixed` field and no migration was run, so the
+    // only digest this shop actually has carries no `figures` key at all — and
+    // it is therefore the first row its owner will open. A stat row that
+    // assumed four figures would crash on exactly that one.
+    expect(heroFigures(withFigures(undefined))).toEqual([]);
+  });
+
+  it("falls through an empty advisor to the analysts, rather than stopping at it", () => {
+    // `figures: []` on the advisor is not "the advisor spoke"; it is "the
+    // advisor had nothing to pick". Treating it as an answer would blank a
+    // page whose analysts each had a number.
+    const picked = heroFigures(
+      sections({
+        sales: sales({
+          figures: [{ label: "Revenue", value: 1846.5, unit: "money" }],
+        }),
+        recommendations: advice({ figures: [] }),
+      }),
+    );
+    expect(picked.map((hero) => hero.figure.label)).toEqual(["Revenue"]);
+  });
+
+  it("carries a series through untouched — oldest first, never re-sorted", () => {
+    // The labels are the model's own short axis strings. Sorting them as text
+    // would put "08 Sep" before "MON" and scramble a week.
+    const series = [
+      { label: "TUE", value: 1140 },
+      { label: "WED", value: 640 },
+      { label: "MON", value: 1846 },
+    ];
+    const picked = heroFigures(
+      sections({
+        sales: sales({
+          figures: [{ label: "Revenue", value: 1846, unit: "money" }],
+          series,
+        }),
+      }),
+    );
+    expect(picked[0]?.series).toEqual(series);
   });
 });

@@ -71,17 +71,73 @@ beforeEach(() => {
   seen = [];
 });
 
+const runAnswer = {
+  localDate: "2026-09-13",
+  period: {
+    preset: "last7" as const,
+    from: "2026-09-06T21:00:00.000Z",
+    to: "2026-09-13T21:00:00.000Z",
+  },
+  quota: {
+    limit: 2,
+    used: 1,
+    remaining: 1,
+    resetsAt: "2026-09-14T21:00:00.000Z",
+  },
+};
+
 describe("runDigest", () => {
-  it("posts to /digests/run and unwraps the 202 envelope to { localDate }", async () => {
-    const service = await loadService(
-      envelope({ localDate: "2026-09-13" }, 202),
-    );
+  it("posts to /digests/run and unwraps the 202 envelope, quota and all", async () => {
+    const service = await loadService(envelope(runAnswer, 202));
 
     const result = await service.runDigest();
 
     expect(seen[0]?.method).toBe("post");
     expect(seen[0]?.url).toBe("/digests/run");
-    expect(result).toEqual({ localDate: "2026-09-13" });
+    // The allowance rides back on the answer, so nothing has to refetch
+    // `GET /digests/quota` to keep the header honest.
+    expect(result.quota).toEqual(runAnswer.quota);
+    expect(result.period.preset).toBe("last7");
+  });
+
+  it("sends no body at all by default, which the API still reads as today", async () => {
+    // `runDigestBodySchema` is `.optional().transform(body => body ?? {})`
+    // precisely so a bodyless "Generate now" keeps working; `{}` is the same
+    // thing one step earlier.
+    const service = await loadService(envelope(runAnswer, 202));
+
+    await service.runDigest();
+
+    expect(seen[0]?.data).toBe(JSON.stringify({}));
+  });
+
+  it("names the preset `period` on the wire, which is NOT what it is called on the way back", async () => {
+    // `runDigestBodySchema` is `period: z.enum(DIGEST_PERIOD_PRESETS)` and is
+    // `.strict()`, so sending `{ preset: "last7" }` is a 422 rather than a
+    // silently-dropped field — and the 202 answers with a `period` that is an
+    // OBJECT. One name, two shapes, opposite directions. `tsc` cannot see any
+    // of this; only an assertion on the bytes can.
+    const service = await loadService(envelope(runAnswer, 202));
+
+    await service.runDigest({ preset: "last7" });
+
+    expect(JSON.parse(String(seen[0]?.data))).toEqual({ period: "last7" });
+  });
+
+  it("sends a custom range as from/to beside it", async () => {
+    const service = await loadService(envelope(runAnswer, 202));
+
+    await service.runDigest({
+      preset: "custom",
+      from: "2026-09-01",
+      to: "2026-09-07",
+    });
+
+    expect(JSON.parse(String(seen[0]?.data))).toEqual({
+      period: "custom",
+      from: "2026-09-01",
+      to: "2026-09-07",
+    });
   });
 });
 

@@ -94,8 +94,37 @@ export const API_ERROR_CODE = Object.freeze({
   SEED_MISSING: "SEED_MISSING",
 
   // AI digest — `Organization.ai` and `/digests/*`.
+  /** 503. The SERVER has no AI provider configured. Not the owner's to fix. */
   AI_NOT_CONFIGURED: "AI_NOT_CONFIGURED",
+  /** 409. This shop switched the digest off. Links to Settings › Insights. */
   AI_DISABLED_FOR_ORGANIZATION: "AI_DISABLED_FOR_ORGANIZATION",
+  /**
+   * 404 from `GET /digests/latest` and `/digests/:id` — "no digest yet" and
+   * "that digest is gone". `NotFoundError` hardcodes `NOT_FOUND` regardless of
+   * the resource, so `digest.service.ts` throws the base `AppError` to get this
+   * code out (`Backend/src/services/digest.service.ts:12-20`).
+   */
+  DIGEST_NOT_FOUND: "DIGEST_NOT_FOUND",
+  /**
+   * 429 from `POST /digests/run`: **today's allowance is spent**.
+   *
+   * Deliberately NOT the bare `TOO_MANY_REQUESTS` the loop-shield limiter on
+   * the same route answers with. "You have used today's two runs, the next is
+   * after midnight" and "you are clicking too fast" need different words, and
+   * the backend gave them different codes precisely so a client cannot
+   * conflate them (`digest.service.ts:129-142`).
+   *
+   * `details` carries the same four fields `GET /digests/quota` returns —
+   * `limit`, `used`, `remaining`, `resetsAt` — so the header re-renders
+   * straight from the refusal without a second request.
+   */
+  DIGEST_QUOTA_EXHAUSTED: "DIGEST_QUOTA_EXHAUSTED",
+  /**
+   * 422. The business's stored IANA zone is not one this server recognises, so
+   * neither the shop's day nor its quota reset can be resolved. Raised by
+   * `shopDay` before anything is spent.
+   */
+  ORGANIZATION_TIMEZONE_INVALID: "ORGANIZATION_TIMEZONE_INVALID",
 
   // Periods — every `from`/`to` endpoint in the API, which is the twelve
   // reports plus the sales, debts and customers lists.
