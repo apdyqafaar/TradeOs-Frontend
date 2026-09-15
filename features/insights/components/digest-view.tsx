@@ -54,8 +54,12 @@ function Header({ digest }: { digest: Digest }) {
 
 /** One of the five boxes on the page. Plain container, no logic of its own. */
 function Card({ title, children }: { title: string; children: ReactNode }) {
+  // The canvas designed this card before the feature existed: the reserved
+  // "Highlights" panel on the Reports artboard (2i) is the slot it held for AI
+  // narratives. 10px radius, 20px padding, mono 10px label, serif 20px prose at
+  // 1.35 with text-wrap: pretty, 720px max. Match that, not a guess.
   return (
-    <section className="flex flex-col gap-3 rounded-[12px] border border-border bg-card p-5">
+    <section className="flex flex-col gap-3 rounded-[10px] border border-border bg-card p-5">
       <h2 className="font-mono text-[10px] text-muted-foreground uppercase tracking-[0.08em]">
         {title}
       </h2>
@@ -217,7 +221,7 @@ export function DigestView({ digest }: { digest: Digest }) {
       <Card title="Sales">
         {sales ? (
           <>
-            <p className="font-serif text-[22px] text-foreground">
+            <p className="max-w-[720px] font-serif text-[20px] text-foreground text-pretty leading-[1.35]">
               {sales.headline}
             </p>
             <Lines items={sales.points} />
@@ -236,7 +240,7 @@ export function DigestView({ digest }: { digest: Digest }) {
       <Card title="Debts">
         {debts ? (
           <>
-            <p className="font-serif text-[22px] text-foreground">
+            <p className="max-w-[720px] font-serif text-[20px] text-foreground text-pretty leading-[1.35]">
               {debts.headline}
             </p>
             <Lines items={debts.points} />
@@ -257,7 +261,7 @@ export function DigestView({ digest }: { digest: Digest }) {
       <Card title="Stock">
         {stock ? (
           <>
-            <p className="font-serif text-[22px] text-foreground">
+            <p className="max-w-[720px] font-serif text-[20px] text-foreground text-pretty leading-[1.35]">
               {stock.headline}
             </p>
             <Lines items={stock.points} />
@@ -278,7 +282,7 @@ export function DigestView({ digest }: { digest: Digest }) {
       <Card title="Team & projects">
         {team ? (
           <>
-            <p className="font-serif text-[22px] text-foreground">
+            <p className="max-w-[720px] font-serif text-[20px] text-foreground text-pretty leading-[1.35]">
               {team.headline}
             </p>
             <Lines items={team.people} />
