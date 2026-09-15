@@ -150,3 +150,47 @@ describe("reads", () => {
     expect(seen[1]?.url).toBe("/digests/d1");
   });
 });
+
+describe("the manual-run quota", () => {
+  it("reads GET /digests/quota and unwraps the envelope", async () => {
+    const service = await loadService(
+      envelope({
+        limit: 3,
+        used: 1,
+        remaining: 2,
+        resetsAt: "2026-09-16T00:00:00.000Z",
+      }),
+    );
+
+    const quota = await service.getDigestQuota();
+
+    expect(seen[0]?.url).toBe("/digests/quota");
+    expect(seen[0]?.method).toBe("get");
+    expect(quota).toEqual({
+      limit: 3,
+      used: 1,
+      remaining: 2,
+      resetsAt: "2026-09-16T00:00:00.000Z",
+    });
+  });
+
+  it("rejects with an ApiError carrying status 404 while the route does not exist", async () => {
+    // The live answer today: `Backend/src/routes/v1/digest.route.ts` has four
+    // `/digests` rows and no quota among them, so a frontend deployed ahead of
+    // the API gets this. `useDigestQuota` is what turns it into silence; the
+    // point here is that it arrives as a normalized `ApiError` and not as a
+    // raw `AxiosError` that would escape the hook's typing.
+    const service = await loadService({
+      status: 404,
+      data: { success: false, message: "Not found", code: "NOT_FOUND" },
+    });
+
+    await expect(service.getDigestQuota()).rejects.toSatisfy(
+      (error: unknown) => {
+        if (!isApiError(error)) return false;
+        expect(error.status).toBe(404);
+        return true;
+      },
+    );
+  });
+});

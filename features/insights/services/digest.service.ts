@@ -1,5 +1,6 @@
 import type {
   Digest,
+  DigestQuota,
   DigestSummary,
   RunDigestResult,
 } from "@/features/insights/types";
@@ -42,3 +43,19 @@ export const listDigests = (params: {
 /** `POST /digests/run` — `organization:update`. 202 — the digest lands about a minute later; callers poll `getLatestDigest`. */
 export const runDigest = (): Promise<RunDigestResult> =>
   apiPost<RunDigestResult>(`${BASE}/run`, {});
+
+/**
+ * `GET /digests/quota` — the manual-run allowance, answered **even when the
+ * shop has no digest at all**, which is why it is its own request rather than
+ * a field on `latest`: the empty screen is exactly where "3 of 3 left today"
+ * belongs.
+ *
+ * **Not in `docs/API-ROUTES.md` and not in the backend router as of
+ * 2026-09-15.** Everything else in this file was checked against that table
+ * first, per CLAUDE.md; this one is written against the rebuild brief's
+ * forecast of a contract still being built. `useDigestQuota` therefore treats
+ * every failure as "do not render the line", so a frontend deployed ahead of
+ * the API shows no quota rather than an error.
+ */
+export const getDigestQuota = (): Promise<DigestQuota> =>
+  apiGet<DigestQuota>(`${BASE}/quota`);
