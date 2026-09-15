@@ -217,7 +217,7 @@ export function DigestView({ digest }: { digest: Digest }) {
       <Card title="Sales">
         {sales ? (
           <>
-            <p className="font-serif text-foreground text-xl leading-tight">
+            <p className="font-serif text-[22px] text-foreground">
               {sales.headline}
             </p>
             <Lines items={sales.points} />
@@ -236,7 +236,7 @@ export function DigestView({ digest }: { digest: Digest }) {
       <Card title="Debts">
         {debts ? (
           <>
-            <p className="font-serif text-foreground text-xl leading-tight">
+            <p className="font-serif text-[22px] text-foreground">
               {debts.headline}
             </p>
             <Lines items={debts.points} />
@@ -257,7 +257,7 @@ export function DigestView({ digest }: { digest: Digest }) {
       <Card title="Stock">
         {stock ? (
           <>
-            <p className="font-serif text-foreground text-xl leading-tight">
+            <p className="font-serif text-[22px] text-foreground">
               {stock.headline}
             </p>
             <Lines items={stock.points} />
@@ -278,7 +278,7 @@ export function DigestView({ digest }: { digest: Digest }) {
       <Card title="Team & projects">
         {team ? (
           <>
-            <p className="font-serif text-foreground text-xl leading-tight">
+            <p className="font-serif text-[22px] text-foreground">
               {team.headline}
             </p>
             <Lines items={team.people} />

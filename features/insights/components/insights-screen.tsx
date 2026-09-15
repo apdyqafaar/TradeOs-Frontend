@@ -61,7 +61,12 @@ export function InsightsScreen() {
   const header = (
     <div className="flex items-start justify-between gap-4">
       <div>
-        <h1 className="font-serif text-3xl text-foreground">Insights</h1>
+        {/* text-[32px] leading-[1.1], not text-3xl: every other page title in the
+            app is set this way, and Tailwind's text-3xl is 30px with a 36px
+            default line-height, which reads looser and sits a size off. */}
+        <h1 className="font-serif text-[32px] leading-[1.1] text-foreground">
+          Insights
+        </h1>
         <p className="text-[13px] text-muted-foreground">
           Your evening digest, written from the day's figures.
         </p>
