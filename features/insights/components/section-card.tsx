@@ -5,14 +5,17 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useId, useState } from "react";
 import { SectionStrip } from "@/features/dashboard/components/section-strip";
-import type { SectionState } from "@/features/insights/lib/digest-shape";
+import {
+  quietCopyFor,
+  type SectionState,
+} from "@/features/insights/lib/digest-shape";
 import {
   figureDeltaClass,
   figureValueClass,
   formatDeltaPct,
   formatFigureValue,
 } from "@/features/insights/lib/figures";
-import type { SectionFigure } from "@/features/insights/types";
+import type { SectionFigure, SectionKey } from "@/features/insights/types";
 
 /**
  * One analyst's card: its numbers, its paragraph, and its own list.
@@ -275,7 +278,7 @@ export function SectionNote({
   title,
   subject,
   state,
-  quietCopy,
+  quietKey,
   link,
 }: {
   /** The card's label, matching the position it stands in for: "Team & projects". */
@@ -287,8 +290,15 @@ export function SectionNote({
    */
   subject: string;
   state: SectionState;
-  /** What a quiet subject says: "No stock moved in this period." */
-  quietCopy: string;
+  /**
+   * Which section this stands in for, so the quiet sentence is looked up from
+   * the copy table by `{reason, section}` rather than passed in as a string.
+   *
+   * Passing the finished sentence would have put the choice at five call sites
+   * and made "which reason did we render this for?" invisible — and `reason` is
+   * an enum that will grow.
+   */
+  quietKey: SectionKey;
   link?: { href: string; label: string };
 }) {
   if (state.kind === "delivered") return null;
@@ -311,8 +321,8 @@ export function SectionNote({
         {title}
       </span>
       <span className="flex-1 text-[13px] text-muted-foreground text-pretty">
-        {quiet ? (
-          quietCopy
+        {state.kind === "quiet" ? (
+          quietCopyFor(quietKey, state.reason)
         ) : (
           <>
             The {subject} analyst did not finish tonight.

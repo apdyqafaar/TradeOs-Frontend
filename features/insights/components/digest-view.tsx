@@ -20,7 +20,6 @@ import {
   heroFigures,
   readSectionState,
   SECTION_LABELS,
-  SECTION_QUIET_COPY,
   SECTION_SUBJECTS,
   type SectionState,
   sectionStates,
@@ -149,7 +148,7 @@ export function DigestView({
               title={SECTION_LABELS.sales}
               subject={SECTION_SUBJECTS.sales}
               state={stateOf("sales")}
-              quietCopy={SECTION_QUIET_COPY.sales}
+              quietKey="sales"
               link={{ href: ROUTES.reportsSales, label: "Sales report" }}
             />
           )}
@@ -183,7 +182,7 @@ export function DigestView({
             title={SECTION_LABELS.debts}
             subject={SECTION_SUBJECTS.debts}
             state={stateOf("debts")}
-            quietCopy={SECTION_QUIET_COPY.debts}
+            quietKey="debts"
             link={{ href: ROUTES.debts, label: "Open debts" }}
           />
         )}
@@ -214,7 +213,7 @@ export function DigestView({
             title={SECTION_LABELS.stock}
             subject={SECTION_SUBJECTS.stock}
             state={stateOf("stock")}
-            quietCopy={SECTION_QUIET_COPY.stock}
+            quietKey="stock"
             link={{ href: `${ROUTES.products}?tab=low`, label: "Low stock" }}
           />
         )}
@@ -233,7 +232,7 @@ export function DigestView({
             title={SECTION_LABELS.team}
             subject={SECTION_SUBJECTS.team}
             state={stateOf("team")}
-            quietCopy={SECTION_QUIET_COPY.team}
+            quietKey="team"
             link={{ href: ROUTES.reportsStaff, label: "Staff report" }}
           />
         )}
@@ -244,7 +243,7 @@ export function DigestView({
           title={SECTION_LABELS.recommendations}
           subject={SECTION_SUBJECTS.recommendations}
           state={stateOf("recommendations")}
-          quietCopy={SECTION_QUIET_COPY.recommendations}
+          quietKey="recommendations"
         />
       ) : null}
     </div>

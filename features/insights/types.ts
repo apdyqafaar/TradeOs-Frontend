@@ -191,6 +191,24 @@ export interface RecommendationAction {
  */
 export type DigestVerdict = "good" | "mixed" | "poor" | "quiet";
 
+/**
+ * Why an analyst was never dispatched.
+ *
+ * **A closed set with one member today, and it will grow** — so it is treated
+ * as an enum and **never rendered**. Printing `"no-activity"` at a shop owner
+ * is printing our internal vocabulary at them, and a value added later would
+ * appear on their screen as a raw slug the day it ships. `SECTION_QUIET_COPY`
+ * maps it to words, with a fallback for a reason this build has not heard of.
+ */
+export const DIGEST_SKIP_REASONS = ["no-activity"] as const;
+export type DigestSkipReason = (typeof DIGEST_SKIP_REASONS)[number];
+
+/** One entry in `skipped`: which analyst stood down, and why. */
+export interface SkippedSection {
+  section: SectionKey;
+  reason: DigestSkipReason;
+}
+
 export interface RecommendationsSection extends SectionNumbers {
   actions: RecommendationAction[];
   warnings: string[];
@@ -257,20 +275,20 @@ export interface DigestSummary {
   sections: DigestSections;
   /**
    * Sections whose analyst was **never dispatched**, because the shop had no
-   * activity of that kind in the period. A quiet day, not a failure — the
-   * third state a section can be in, beside "delivered" and "did not finish".
+   * activity of that kind in the period. A quiet day, not a failure — the third
+   * state a section can be in, beside "delivered" and "did not finish".
    *
-   * **THE FIELD NAME IS NOT FINAL.** The backend task landing this is choosing
-   * it as this ships. `readSectionState` in `lib/digest-shape.ts` is the only
-   * code that reads it, and this line is the only place it is typed, so
-   * renaming it is two edits and no hunting.
+   * **A quiet section's `sections.<key>` is `null`, exactly as a failed one's
+   * is.** `null` alone cannot tell the two apart: membership here is the only
+   * discriminator, and absence from `errors` is the confirmation. Any code that
+   * branches on `section == null` calls every quiet section a failure, which is
+   * the bug this field exists to prevent — and a small shop has quiet days
+   * constantly, so that bug would fire on the most ordinary day it has.
    *
-   * A small shop has quiet days constantly, which is why this cannot be folded
-   * into `null`: "the stock analyst did not finish tonight" printed on a day
-   * when no stock moved is a lie the owner has no way to detect, and it makes
-   * a working product look broken every quiet day for ever.
+   * Always present on the wire and `[]` on rows written before it existed;
+   * optional here because a defensive read costs nothing.
    */
-  skipped?: SectionKey[];
+  skipped?: SkippedSection[];
   errors: { section: SectionKey; message: string }[];
   usage: {
     inputTokens: number;

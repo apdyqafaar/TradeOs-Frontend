@@ -5,6 +5,7 @@ import {
   analystsReported,
   headlineOf,
   heroFigures,
+  quietCopyFor,
   readSectionState,
   sectionStates,
   summaryOf,
@@ -96,8 +97,75 @@ describe("a section has three states, not two", () => {
     // finish tonight" printed on a day when no stock moved is a lie the owner
     // cannot detect, and it makes a working product look broken every quiet
     // day for ever.
-    expect(readSectionState(digest({ skipped: ["stock"] }), "stock")).toEqual({
-      kind: "quiet",
+    //
+    // **`sections.stock` is `null` here exactly as it is for a failed
+    // section.** Nothing in the value tells the two apart; membership in
+    // `skipped` is the only discriminator, which is precisely what a
+    // `section == null ? "failed" : "ok"` at a call site would miss.
+    expect(
+      readSectionState(
+        digest({ skipped: [{ section: "stock", reason: "no-activity" }] }),
+        "stock",
+      ),
+    ).toEqual({ kind: "quiet", reason: "no-activity" });
+  });
+
+  it("carries the reason for looking copy up with, and never for printing", () => {
+    // `reason` is a closed set with one member today that will grow. A screen
+    // that printed it would put the raw slug `no-activity` in front of a shop
+    // owner the day a second member ships.
+    const state = readSectionState(
+      digest({ skipped: [{ section: "stock", reason: "no-activity" }] }),
+      "stock",
+    );
+    expect(state.kind === "quiet" && state.reason).toBe("no-activity");
+    expect(quietCopyFor("stock", "no-activity")).toBe(
+      "No stock moved in this period.",
+    );
+  });
+
+  it("falls back to a true sentence for a reason this build has never heard of", () => {
+    // The enum grows server-side first. Indexing the table with an unknown key
+    // is `undefined`, which React renders as an empty card — and the obvious
+    // "fix" is to print the slug. Neither is acceptable, so the fallback is a
+    // sentence that holds for any reason we might add.
+    const copy = quietCopyFor("stock", "budget-preflight");
+    expect(copy).toMatch(/nothing in stock to read/i);
+    expect(copy).not.toMatch(/budget-preflight/);
+  });
+
+  it("claims no comparison on a quiet sales day, because none was made", () => {
+    // A no-sale day genuinely loses its week-on-week comparison: the sales
+    // analyst is never dispatched, so nobody says "quiet today, but last
+    // Tuesday was strong". Copy implying otherwise would paper over a real
+    // cost of the preflight saving with a comparison nothing performed.
+    const copy = quietCopyFor("sales", "no-activity");
+    expect(copy).toBe("No sales were recorded in this period.");
+    expect(copy).not.toMatch(/than usual|last week|quieter|compared/i);
+  });
+
+  it("never puts our own word for it in front of the owner", () => {
+    for (const key of [
+      "sales",
+      "debts",
+      "stock",
+      "team",
+      "recommendations",
+    ] as const) {
+      const copy = quietCopyFor(key, "no-activity");
+      // "Skipped" sounds like a failure and is internal vocabulary; "analyst"
+      // makes it a fact about our machinery rather than about the shop's day.
+      expect(copy).not.toMatch(/skipped|analyst|did not run|failed/i);
+    }
+  });
+
+  it("treats an absent `skipped` as no quiet sections rather than crashing", () => {
+    // Always present on the wire and `[]` on old rows — but a defensive read
+    // costs nothing, and an API build older than the field is the one case
+    // that sends neither.
+    expect(readSectionState(digest({ skipped: undefined }), "stock")).toEqual({
+      kind: "failed",
+      reason: undefined,
     });
   });
 
@@ -106,7 +174,10 @@ describe("a section has three states, not two", () => {
     // Rendering the section we were sent is the honest resolution of it.
     expect(
       readSectionState(
-        digest({ sections: sections({ sales: sales() }), skipped: ["sales"] }),
+        digest({
+          sections: sections({ sales: sales() }),
+          skipped: [{ section: "sales", reason: "no-activity" }],
+        }),
         "sales",
       ),
     ).toEqual({ kind: "delivered" });
@@ -149,7 +220,7 @@ describe("analystsReported", () => {
             team: { headline: "", people: [], projects: [] },
             recommendations: advice(),
           }),
-          skipped: ["stock"],
+          skipped: [{ section: "stock", reason: "no-activity" }],
         }),
       ),
     ).toBe(5);
@@ -182,7 +253,7 @@ describe("sectionStates", () => {
     const chips = sectionStates(
       digest({
         sections: sections({ sales: sales(), recommendations: advice() }),
-        skipped: ["stock"],
+        skipped: [{ section: "stock", reason: "no-activity" }],
       }),
     );
 
@@ -410,7 +481,7 @@ describe("actionsSummary — the tail names failures, never quiet subjects", () 
               actions: [{ priority: "high", kind: "chase", text: "a" }],
             }),
           }),
-          skipped: ["stock"],
+          skipped: [{ section: "stock", reason: "no-activity" }],
         }),
       ),
     ).toBe("1 action · 1 high");

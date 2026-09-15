@@ -487,7 +487,12 @@ describe("DigestView — a quiet section is not a failed one", () => {
     // tonight" on a day when no stock moved is a lie the owner cannot detect,
     // and it makes a working product look broken every quiet day for ever.
     render(
-      <DigestView currency="ETB" digest={partial({ skipped: ["stock"] })} />,
+      <DigestView
+        currency="ETB"
+        digest={partial({
+          skipped: [{ section: "stock", reason: "no-activity" }],
+        })}
+      />,
     );
 
     expect(
@@ -501,7 +506,12 @@ describe("DigestView — a quiet section is not a failed one", () => {
 
   it("counts a quiet analyst as having reported", () => {
     render(
-      <DigestView currency="ETB" digest={partial({ skipped: ["stock"] })} />,
+      <DigestView
+        currency="ETB"
+        digest={partial({
+          skipped: [{ section: "stock", reason: "no-activity" }],
+        })}
+      />,
     );
     expect(screen.getByText("5 of 5 analysts reported")).toBeInTheDocument();
   });
@@ -545,5 +555,33 @@ describe("DigestView — a quiet section is not a failed one", () => {
       "href",
       "/products?tab=low",
     );
+  });
+});
+
+describe("DigestView — a genuinely quiet day comes back complete", () => {
+  it("agrees with the row: Complete, 5 of 5, and a chip saying which subject was quiet", () => {
+    // `status` already counts a quiet section as delivered server-side, so a
+    // quiet day is `complete` and NOT `partial`. The page must not contradict
+    // the row it is rendering: "4 of 5 analysts reported" beside a Complete
+    // pill is one screen disagreeing with itself.
+    render(
+      <DigestView
+        currency="ETB"
+        digest={digest({
+          status: "complete",
+          sections: { ...digest().sections, stock: null },
+          skipped: [{ section: "stock", reason: "no-activity" }],
+          errors: [],
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Complete")).toBeInTheDocument();
+    expect(screen.getByText("5 of 5 analysts reported")).toBeInTheDocument();
+    // The chip still shows, because it is what tells the reader WHY there is
+    // no stock card — and it is not the warning tone a failure gets.
+    const chip = screen.getByText("· quiet");
+    expect(chip.parentElement).toHaveClass("text-muted-foreground");
+    expect(chip.parentElement).not.toHaveClass("text-warning-strong");
   });
 });

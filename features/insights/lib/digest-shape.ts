@@ -1,6 +1,7 @@
 import type {
   Digest,
   DigestSections,
+  DigestSkipReason,
   DigestSummary,
   DigestVerdict,
   SectionFigure,
@@ -67,19 +68,70 @@ export const SECTION_SUBJECTS: Record<SectionKey, string> = {
 /**
  * What a quiet section says, in the owner's words.
  *
- * **Never "skipped".** That is our internal word for it and it sounds like a
- * failure; what actually happened is that the shop had a quiet day in that
- * one subject, which is ordinary and frequent for a small shop. The copy names
- * the absence of the ACTIVITY, not the absence of the analyst, and carries no
- * warning tone at all — nothing went wrong.
+ * **The wire carries no prose for a quiet section, and that is deliberate.**
+ * The backend was asked to write this sentence and declined, correctly: an
+ * organization has an `ai.language`, so an English line generated server-side
+ * would appear on a Somali or Amharic shop's digest beside four sections
+ * written in their own language. So the words are ours, and they live here —
+ * one table outside the components, keyed the way a message catalogue is keyed,
+ * which is the one file to change when this app gets one. (It has none today:
+ * every string in this UI is an English literal, so the quiet card is no worse
+ * off than "Chase first" or "What to do tomorrow" beside it. That gap is real
+ * and it is the whole product's, not this card's.)
+ *
+ * Three rules the copy follows:
+ *
+ *  - **Never "skipped".** That is our internal word and it sounds like a
+ *    failure. What happened is that the shop had a quiet day in one subject,
+ *    which is ordinary and frequent.
+ *  - **Name the absent ACTIVITY, not the absent analyst.** "No stock moved",
+ *    not "the stock analyst did not run" — the second is a fact about our
+ *    machinery and reads as a fault.
+ *  - **Claim no comparison.** A no-sale day genuinely loses its week-on-week
+ *    comparison: the sales analyst is never dispatched, so nobody says "quiet
+ *    today, but last Tuesday was strong". That is a real cost of the preflight
+ *    saving, and writing "quieter than usual" here would paper over it with a
+ *    comparison nothing actually made.
+ *
+ * Keyed by reason first so a second reason is a new row rather than a rewrite.
  */
-export const SECTION_QUIET_COPY: Record<SectionKey, string> = {
-  sales: "No sales were recorded in this period.",
-  debts: "No debts were owed, paid or fell due in this period.",
-  stock: "No stock moved in this period.",
-  team: "No staff sales or project updates in this period.",
-  recommendations: "Nothing came up that needs doing tomorrow.",
+export const SECTION_QUIET_COPY: Record<
+  DigestSkipReason,
+  Record<SectionKey, string>
+> = {
+  "no-activity": {
+    sales: "No sales were recorded in this period.",
+    debts: "No debts were owed, paid or fell due in this period.",
+    stock: "No stock moved in this period.",
+    team: "No staff sales or project updates in this period.",
+    recommendations: "Nothing came up that needs doing tomorrow.",
+  },
 };
+
+/**
+ * The sentence for one quiet section — and the reason this is a function
+ * rather than two index lookups at the call site.
+ *
+ * `reason` is a closed set **that will grow**, and a frontend deployed before
+ * the backend adds its second member would index the table with a key it does
+ * not have. `SECTION_QUIET_COPY["budget"]?.[key]` is `undefined`, which React
+ * renders as an empty card, and the obvious "fix" of printing `reason` puts the
+ * raw slug `no-activity` in front of a shop owner. This falls back to a true
+ * sentence that holds for any reason we might add: the analyst stood down and
+ * nothing is wrong.
+ */
+export function quietCopyFor(
+  key: SectionKey,
+  reason: DigestSkipReason | string,
+): string {
+  const byReason = (
+    SECTION_QUIET_COPY as Record<string, Record<SectionKey, string> | undefined>
+  )[reason];
+  return (
+    byReason?.[key] ??
+    `There was nothing in ${SECTION_SUBJECTS[key]} to read for this period.`
+  );
+}
 
 /**
  * The three states one section can be in.
@@ -95,30 +147,36 @@ export type SectionState =
   | { kind: "delivered" }
   /** Dispatched and could not finish. The canvas's minus-icon rows describe this. */
   | { kind: "failed"; reason?: string }
-  /** Never dispatched: the shop had no activity of that kind. Not an error. */
-  | { kind: "quiet" };
+  /**
+   * Never dispatched: the shop had no activity of that kind. Not an error.
+   * `reason` is an enum for looking copy up with, never for printing.
+   */
+  | { kind: "quiet"; reason: DigestSkipReason };
 
 /**
  * **The one place the wire is read into a section state.**
  *
- * The backend field that marks a quiet section is `skipped` on the digest row
- * and **its name is not final** — it is being decided as this ships. That is
- * why the mapping lives in exactly one function: when it changes, this is the
- * line, plus its declaration in `features/insights/types.ts`. Nothing else in
- * the feature touches `digest.skipped`, and nothing else compares a section to
- * `null`.
+ * `sections[key]` is `null` for a quiet section and `null` for a failed one —
+ * identically, with nothing in the value to tell them apart. Membership in
+ * `skipped` is the only discriminator and absence from `errors` is the
+ * confirmation, which is precisely why this is one function everything reads
+ * rather than a `section == null` scattered down the components: that
+ * comparison calls every quiet section a failure, and a small shop is quiet
+ * constantly.
  *
- * Order matters. A section that arrived is `delivered` whatever any other
- * field says — a row that is both present and listed as quiet is a backend
- * inconsistency, and rendering the content we actually have is the honest
- * resolution of it.
+ * Order matters. A section that arrived is `delivered` whatever any other field
+ * says — a row both present and listed as quiet is a backend inconsistency, and
+ * rendering the content we actually have is the honest resolution of it.
  */
 export function readSectionState(
   digest: Pick<DigestSummary, "sections" | "errors" | "skipped">,
   key: SectionKey,
 ): SectionState {
   if (digest.sections[key] !== null) return { kind: "delivered" };
-  if (digest.skipped?.includes(key)) return { kind: "quiet" };
+
+  const quiet = digest.skipped?.find((entry) => entry.section === key);
+  if (quiet) return { kind: "quiet", reason: quiet.reason };
+
   return {
     kind: "failed",
     reason: digest.errors.find((entry) => entry.section === key)?.message,
