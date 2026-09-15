@@ -15,6 +15,19 @@ interface BarChartProps {
   /** The x-axis labels, one per bucket, in the same order as `series`. */
   bucketLabels: string[];
   tone?: BarChartTone;
+  /**
+   * One bucket drawn at full strength with the rest receding — the Insights
+   * canvas's "today in accent, rest accent-soft".
+   *
+   * Omitted (the Overview's case) every bar keeps the full tone, which is the
+   * behaviour this chart shipped with: there is no "today" on a 30-day trend,
+   * and dimming six of seven bars to emphasise one the reader did not ask
+   * about is noise. Out of range is the same as omitted.
+   *
+   * Emphasis only. Which bucket is which is on the axis underneath in text,
+   * and the chart's `aria-label` lists every bucket and value regardless.
+   */
+  highlightIndex?: number;
   /** Plot height in pixels. The canvas draws 176 on the Overview, 140 in the specimen sheet. */
   height?: number;
   className?: string;
@@ -26,6 +39,22 @@ const TONE_CLASS: Record<BarChartTone, string> = {
   info: "bg-chart-3",
   warning: "bg-chart-4",
   success: "bg-chart-5",
+};
+
+/**
+ * The receding variant, used only when `highlightIndex` names a bucket.
+ *
+ * An alpha of the same chart token rather than a second hand-picked colour:
+ * the canvas's `#EAC7B8` is `#D97757` over the card ground, and `#5A4038` is
+ * the dark-mode accent over the dark card. One token, both themes, no second
+ * palette to keep in step.
+ */
+const TONE_DIM_CLASS: Record<BarChartTone, string> = {
+  primary: "bg-chart-1/35",
+  muted: "bg-chart-2/35",
+  info: "bg-chart-3/35",
+  warning: "bg-chart-4/35",
+  success: "bg-chart-5/35",
 };
 
 /**
@@ -47,9 +76,17 @@ export function BarChart({
   axisLabels,
   bucketLabels,
   tone = "primary",
+  highlightIndex,
   height = 176,
   className,
 }: BarChartProps) {
+  // `highlightIndex` only dims the others when it actually names one of them.
+  // An out-of-range index (a series that arrived shorter than the caller
+  // expected) would otherwise dim every bar and emphasise nothing.
+  const highlights =
+    highlightIndex !== undefined &&
+    highlightIndex >= 0 &&
+    highlightIndex < series.length;
   // `Math.max(0, ...)` rather than `Math.max(...series)`: an empty series
   // would otherwise give `-Infinity`, and every bar `height: -Infinity%`.
   const max = Math.max(0, ...series);
@@ -59,6 +96,7 @@ export function BarChart({
     // buckets never reorder, and two days can share a label ("Mon" twice on a
     // fortnight view), which would collide if the label were the key.
     key: `bucket-${index}`,
+    index,
     label: bucketLabels[index] ?? "",
     value,
     // The guard the whole component exists to get right: an all-zero series is
@@ -123,7 +161,9 @@ export function BarChart({
                 style={{ height: `${bucket.percent}%` }}
                 className={cn(
                   "w-full max-w-[56px] rounded-t-[6px]",
-                  TONE_CLASS[tone],
+                  highlights && bucket.index !== highlightIndex
+                    ? TONE_DIM_CLASS[tone]
+                    : TONE_CLASS[tone],
                 )}
               />
             </div>

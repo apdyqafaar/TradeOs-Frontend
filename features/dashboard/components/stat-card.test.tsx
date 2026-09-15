@@ -23,3 +23,21 @@ describe("StatCard", () => {
     expect(container.querySelector("[data-slot='stat-card-foot']")).toBeNull();
   });
 });
+
+describe("StatCard — the caution tone", () => {
+  it("draws a caution as the warning tone, not as no opinion at all", () => {
+    // The digest's figures carry a model-written tone with four values, and
+    // `warn` → `neutral` is the one narrowing that loses information: "stock
+    // cover is thinning" rendered in the same grey as "nothing to report".
+    render(
+      <StatCard
+        label="Stock cover"
+        value="4 days"
+        delta="−2 days"
+        deltaTone="caution"
+      />,
+    );
+
+    expect(screen.getByText("−2 days")).toHaveClass("text-warning-strong");
+  });
+});

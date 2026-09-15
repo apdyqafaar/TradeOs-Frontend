@@ -1,8 +1,18 @@
 import { cn } from "cn";
 import { Info } from "lucide-react";
 
-/** How the delta reads, not what it says — the caller decides the sign and the words. */
-export type StatDeltaTone = "positive" | "negative" | "neutral";
+/**
+ * How the delta reads, not what it says — the caller decides the sign and the
+ * words.
+ *
+ * `caution` is the fourth because the digest's figures carry a model-written
+ * `tone` with four values (`features/insights/types.ts`), and the one mapping
+ * that loses information is `warn` → `neutral`: "stock cover is thinning"
+ * rendered as "nothing in particular". Tone is never the only carrier of the
+ * meaning — the delta text and the footnote beside it always say it in words —
+ * so this is emphasis, not information (WCAG 1.4.1).
+ */
+export type StatDeltaTone = "positive" | "negative" | "neutral" | "caution";
 
 interface StatCardProps {
   /** Mono, uppercase, tracked. Short — "Today's revenue", not a sentence. */
@@ -33,6 +43,7 @@ const DELTA_TONE_CLASS: Record<StatDeltaTone, string> = {
   positive: "text-success-strong",
   negative: "text-destructive-strong",
   neutral: "text-muted-foreground",
+  caution: "text-warning-strong",
 };
 
 /**
